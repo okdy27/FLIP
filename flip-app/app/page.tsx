@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MiniKit, PayCommandInput } from "@worldcoin/minikit-js";
+import { MiniKit } from '@worldcoin/minikit-js'
 
 // Kamus Bahasa (Localization)
 const translations = {
@@ -122,7 +122,17 @@ export default function Home() {
           description: "FLIP Swap Fee (0.3%)",
         };
 
-        const response = await MiniKit.commandsAsync.pay(payPayload);
+        const res = await MiniKit.commandsAsync.pay({
+  reference: "some-unique-id",
+  to: "0x123...", // alamat penerima
+  tokens: [
+    {
+      symbol: "WLD",
+      token_amount: "1.0",
+    },
+  ],
+  description: "Pembayaran FLIP",
+})
         console.log("Status Komisi:", response);
       } catch (error) {
         console.error("Error transaksi:", error);
