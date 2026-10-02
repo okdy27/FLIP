@@ -2,22 +2,67 @@
 
 import { useState } from 'react';
 import WalletHeader from './wallet-header';
+import { MiniKit, Tokens, PayCommandInput } from '@worldcoin/minikit-js';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'wallet' | 'swap'>('wallet');
+  const [amount, setAmount] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fungsi untuk mengeksekusi Swap menggunakan MiniKit Pay / Transaction
+  const handleSwap = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      alert('Masukkan jumlah token yang valid.');
+      return;
+    }
+
+    if (!MiniKit.isInstalled()) {
+      alert('Buka aplikasi FLIP melalui World App untuk melakukan Swap.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const payPayload: PayCommandInput = {
+        reference: `flip-swap-${Date.now()}`,
+        to: '0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000', // Alamat Router / Receiver FLIP
+        tokens: [
+          {
+            symbol: Tokens.WLD,
+            token_amount: amount,
+          },
+        ],
+        description: `FLIP Swap: ${amount} WLD`,
+      };
+
+      const response = await MiniKit.commandsAsync.pay(payPayload);
+
+      if (response?.finalPayload?.status === 'success') {
+        alert('Transaksi Swap berhasil diajukan!');
+        setAmount('');
+      } else {
+        alert('Transaksi dibatalkan atau gagal.');
+      }
+    } catch (err: any) {
+      console.error('Error saat Swap:', err);
+      alert('Terjadi kesalahan saat memproses Swap.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center">
-      {/* Container utama seluler/mobile-first */}
       <div className="w-full max-w-md min-h-screen flex flex-col bg-slate-900 border-x border-slate-800 shadow-2xl">
         
-        {/* Header dengan Integrasi MiniKit World ID */}
+        {/* Header Autentikasi World ID */}
         <WalletHeader />
 
-        {/* Konten Utamanya */}
+        {/* Konten Utama */}
         <div className="flex-1 p-4 space-y-6">
           
-          {/* Kartu Ringkasan Saldo (Wallet Overview) */}
+          {/* Ringkasan Saldo Dompet */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-900/40 via-slate-800 to-slate-900 border border-emerald-500/20 shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-400 font-bold text-6xl select-none">
               FLIP
@@ -30,7 +75,7 @@ export default function Home() {
               Rp 0 <span className="text-xs text-slate-400 font-normal">IDR</span>
             </h2>
 
-            {/* Tombol Aksi Cepat */}
+            {/* Tombol Navigasi Cepat */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={() => setActiveTab('swap')}
@@ -47,7 +92,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Tab Navigasi Sederhana */}
+          {/* Navigasi Tab */}
           <div className="flex bg-slate-950/60 p-1 rounded-xl border border-slate-800">
             <button
               onClick={() => setActiveTab('wallet')}
@@ -71,9 +116,8 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Area Konten Sesuai Tab Terpilih */}
+          {/* Area Tampilan Berdasarkan Tab */}
           {activeTab === 'wallet' ? (
-            /* Tab 1: Daftar Aset */
             <div className="space-y-3">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
                 Aset Terhubung (World Chain)
@@ -110,63 +154,67 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            /* Tab 2: Placeholder Swap Interface */
             <div className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-emerald-400">FLIP Swap Fast Interface</h3>
+                <h3 className="text-sm font-bold text-emerald-400">FLIP Instant Swap</h3>
                 <span className="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">
-                  MiniKit SDK
+                  World Chain
                 </span>
               </div>
 
+              {/* Input Token Asal */}
               <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
                 <div className="flex justify-between text-xs text-slate-400">
                   <span>Anda Bayar</span>
-                  <span>Saldo: 0.00</span>
+                  <span>Saldo: 0.00 WLD</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <input
                     type="number"
                     placeholder="0.0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     className="bg-transparent text-xl font-bold text-white outline-none w-1/2"
-                    disabled
                   />
-                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-emerald-400">
                     WLD
                   </span>
                 </div>
               </div>
 
+              {/* Estimasi Token Tujuan */}
               <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
                 <div className="flex justify-between text-xs text-slate-400">
-                  <span>Anda Terima</span>
-                  <span>Saldo: 0.00</span>
+                  <span>Anda Terima (Estimasi)</span>
+                  <span>Saldo: 0.00 USDC</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <input
                     type="number"
                     placeholder="0.0"
-                    className="bg-transparent text-xl font-bold text-white outline-none w-1/2"
+                    value={amount ? (parseFloat(amount) * 1.5).toFixed(2) : ''}
                     disabled
+                    className="bg-transparent text-xl font-bold text-slate-400 outline-none w-1/2"
                   />
-                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300">
                     USDC
                   </span>
                 </div>
               </div>
 
+              {/* Tombol Eksekusi */}
               <button
-                disabled
-                className="w-full py-3 bg-emerald-500/50 text-slate-950 font-bold rounded-xl text-sm cursor-not-allowed text-center"
+                onClick={handleSwap}
+                disabled={isProcessing}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 text-center"
               >
-                Siap Diintegrasikan (Fokus Selanjutnya)
+                {isProcessing ? 'Memproses Swap...' : 'Eksekusi Swap'}
               </button>
             </div>
           )}
 
         </div>
 
-        {/* Footer info status */}
         <footer className="p-3 text-center text-[11px] text-slate-500 border-t border-slate-800">
           FLIP Wallet Mini App &bull; Powered by World Chain & MiniKit SDK
         </footer>
