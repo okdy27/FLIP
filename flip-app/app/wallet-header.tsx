@@ -5,75 +5,70 @@ import { MiniKit } from '@worldcoin/minikit-js';
 
 export default function WalletHeader() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleWorldIDLogin = useCallback(async () => {
-    setIsVerifying(true);
+  const connectWorldIDWallet = useCallback(async () => {
+    setIsConnecting(true);
     setErrorMessage(null);
 
     try {
       if (!MiniKit.isInstalled()) {
-        setErrorMessage('Silakan buka aplikasi ini di dalam World App.');
-        setIsVerifying(false);
+        setErrorMessage('Buka aplikasi ini di dalam World App Simulator.');
+        setIsConnecting(false);
         return;
       }
 
-      // 1. Coba ambil alamat dompet pengguna yang sudah login di World App
-      const userAddress = (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
+      // 1. Cek jika alamat dompet sudah tersedia di instance MiniKit
+      const existingAddress =
+        (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
 
-      if (userAddress) {
-        setWalletAddress(`${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`);
-        setIsVerifying(false);
+      if (existingAddress) {
+        setWalletAddress(`${existingAddress.slice(0, 6)}...${existingAddress.slice(-4)}`);
+        setIsConnecting(false);
         return;
       }
 
-      // 2. Jika belum terhubung, panggil perintah Verifikasi Native World ID
-      const verifyPayload = {
-        action: '', // Dikosongkan untuk Mini App native autentikasi
-        signal: '',
-        verification_level: 'device',
-      };
+      // 2. Memicu POP-UP Native World App Koneksi Dompet (Wallet Auth)
+      const nonce = Math.random().toString(36).substring(2, 15);
+      
+      const authRes = await (MiniKit as any).commandsAsync?.walletAuth({
+        nonce: nonce,
+        requestId: `flip-auth-${Date.now()}`,
+        expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Hari
+        statement: 'Hubungkan dompet World ID Anda ke FLIP Wallet & Swap',
+      });
 
-      const res = await (MiniKit as any).commandsAsync?.verify(verifyPayload);
+      console.log('Response Wallet Auth:', authRes);
 
-      if (res?.finalPayload?.status === 'success') {
-        const addressAfterVerify =
+      if (authRes?.finalPayload?.status === 'success') {
+        const address =
+          authRes?.finalPayload?.address ||
           (MiniKit as any).walletAddress ||
-          (MiniKit as any).user?.walletAddress ||
-          res?.finalPayload?.address;
+          (MiniKit as any).user?.walletAddress;
 
-        if (addressAfterVerify) {
-          setWalletAddress(`${addressAfterVerify.slice(0, 6)}...${addressAfterVerify.slice(-4)}`);
+        if (address) {
+          setWalletAddress(`${address.slice(0, 6)}...${address.slice(-4)}`);
         } else {
-          setWalletAddress('Terverifikasi');
+          setWalletAddress('Terhubung');
         }
       } else {
-        // Jika batal atau error, tampilkan fallback aman
-        if ((MiniKit as any).isInstalled()) {
-          setWalletAddress('World App User');
-        } else {
-          setErrorMessage('Verifikasi dibatalkan');
-        }
+        setErrorMessage('Koneksi dompet dibatalkan.');
       }
     } catch (err: any) {
-      console.error('Error World ID:', err);
-      if ((MiniKit as any).isInstalled()) {
-        setWalletAddress('World App User');
-      } else {
-        setErrorMessage(err?.message || 'Terjadi kesalahan sistem');
-      }
+      console.error('Error Wallet Auth:', err);
+      setErrorMessage(err?.message || 'Gagal menghubungkan dompet World ID');
     } finally {
-      setIsVerifying(false);
+      setIsConnecting(false);
     }
   }, []);
 
-  // Memicu koneksi otomatis saat dibuka di dalam World App
+  // Pop-up otomatis dipicu saat aplikasi pertama kali dimuat di Simulator World App
   useEffect(() => {
     if (MiniKit.isInstalled() && !walletAddress) {
-      handleWorldIDLogin();
+      connectWorldIDWallet();
     }
-  }, [handleWorldIDLogin, walletAddress]);
+  }, [connectWorldIDWallet, walletAddress]);
 
   return (
     <header className="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10 flex justify-between items-center">
@@ -86,22 +81,23 @@ export default function WalletHeader() {
 
       <div>
         {walletAddress ? (
-          <div className="px-3 py-1.5 bg-emerald-950/80 border border-emerald-600/50 rounded-xl text-xs font-mono font-bold text-emerald-300">
-            {walletAddress}
+          <div className="px-3 py-1.5 bg-emerald-950/80 border border-emerald-600/50 rounded-xl text-xs font-mono font-bold text-emerald-300 flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>{walletAddress}</span>
           </div>
         ) : (
           <button
-            onClick={handleWorldIDLogin}
-            disabled={isVerifying}
+            onClick={connectWorldIDWallet}
+            disabled={isConnecting}
             className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md active:scale-95"
           >
-            {isVerifying ? 'Memproses...' : 'Masuk World ID'}
+            {isConnecting ? 'Menghubungkan...' : 'Konek World ID'}
           </button>
         )}
       </div>
 
       {errorMessage && (
-        <div className="absolute top-16 left-4 right-4 p-2 bg-rose-950/90 border border-rose-800 rounded-lg text-xs text-rose-200">
+        <div className="absolute top-16 left-4 right-4 p-2 bg-rose-950/90 border border-rose-800 rounded-lg text-xs text-rose-200 text-center">
           {errorMessage}
         </div>
       )}
