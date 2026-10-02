@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import WalletHeader from './wallet-header';
-import { MiniKit, Tokens, PayCommandInput } from '@worldcoin/minikit-js';
+import { MiniKit } from '@worldcoin/minikit-js';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'wallet' | 'swap'>('wallet');
@@ -24,19 +24,19 @@ export default function Home() {
     setIsProcessing(true);
 
     try {
-      const payPayload: PayCommandInput = {
+      const payPayload = {
         reference: `flip-swap-${Date.now()}`,
         to: '0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000', // Alamat Router / Receiver FLIP
         tokens: [
           {
-            symbol: Tokens.WLD,
+            symbol: 'WLD',
             token_amount: amount,
           },
         ],
         description: `FLIP Swap: ${amount} WLD`,
       };
 
-      const response = await MiniKit.commandsAsync.pay(payPayload);
+      const response = await (MiniKit as any).commandsAsync?.pay(payPayload);
 
       if (response?.finalPayload?.status === 'success') {
         alert('Transaksi Swap berhasil diajukan!');
