@@ -31,6 +31,13 @@ const translations = {
     trust: "🔒 Secure & Verified on World Network",
     previewTitle: "[Browser Preview Mode]",
     fetchingBalances: "Syncing Live Blockchain Data...",
+    receiveTitle: "Receive Tokens",
+    copyAddress: "Copy Address",
+    addressCopied: "Address Copied!",
+    sendTitle: "Send Tokens",
+    recipientAddress: "Recipient Address",
+    amountLabel: "Amount",
+    btnSendNow: "Send Now",
   },
   id: {
     home: "Beranda",
@@ -58,6 +65,13 @@ const translations = {
     trust: "🔒 Aman & Terverifikasi di World Network",
     previewTitle: "[Pratinjau Mode Browser]",
     fetchingBalances: "Menyingkronkan Data Blockchain Live...",
+    receiveTitle: "Terima Token",
+    copyAddress: "Salin Alamat",
+    addressCopied: "Alamat Disalin!",
+    sendTitle: "Kirim Token",
+    recipientAddress: "Alamat Tujuan",
+    amountLabel: "Jumlah",
+    btnSendNow: "Kirim Sekarang",
   },
   es: {
     home: "Inicio",
@@ -85,6 +99,13 @@ const translations = {
     trust: "🔒 Seguro y Verificado en World Network",
     previewTitle: "[Vista Previa del Navegador]",
     fetchingBalances: "Sincronizando Datos Live de Blockchain...",
+    receiveTitle: "Recibir Tokens",
+    copyAddress: "Copiar Dirección",
+    addressCopied: "¡Dirección Copiada!",
+    sendTitle: "Enviar Tokens",
+    recipientAddress: "Dirección de Destino",
+    amountLabel: "Monto",
+    btnSendNow: "Enviar Ahora",
   },
 };
 
@@ -102,23 +123,22 @@ interface TokenAsset {
   iconBg: string;
 }
 
-// Daftar Kontrak Token Resmi World Chain (Mainnet ID: 480)
-const WORLD_CHAIN_TOKENS: Omit<TokenAsset, "amount" | "valueUsd" | "priceUsd" | "change24h">[] = [
-  { symbol: "WLD", name: "Worldcoin", contractAddress: "0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3", iconBg: "bg-emerald-500" },
-  { symbol: "USDC", name: "USD Coin", contractAddress: "0x79a60a8438cc914800cbae917621a876b28824d1", iconBg: "bg-blue-500" },
-  { symbol: "WETH", name: "Wrapped Ether", contractAddress: "0x9fd0b9554a718a8d85c21eeef359dc850604d006", iconBg: "bg-indigo-500" },
-  { symbol: "FOOTBALL", name: "Crazy Football", contractAddress: "0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000", iconBg: "bg-green-600" },
-  { symbol: "ORO", name: "Oro Token", contractAddress: "0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000", iconBg: "bg-amber-500" },
-  { symbol: "H2O", name: "H2O Clean", contractAddress: "0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000", iconBg: "bg-cyan-500" },
-  { symbol: "$AXO", name: "Axolotl World", contractAddress: "0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000", iconBg: "bg-pink-500" },
-];
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [lang, setLang] = useState<Language>("en");
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [isFetchingLive, setIsFetchingLive] = useState(false);
-  
+  const [copied, setCopied] = useState(false);
+
+  // Modal States
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+
+  // Send Form States
+  const [sendRecipient, setSendRecipient] = useState("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendToken, setSendToken] = useState("WLD");
+
   // State Token & Balances
   const [tokenAssets, setTokenAssets] = useState<TokenAsset[]>([
     { symbol: "WLD", name: "Worldcoin", contractAddress: "0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3", amount: 4.25, priceUsd: 2.00, valueUsd: 8.50, change24h: 3.45, iconBg: "bg-emerald-500" },
@@ -141,16 +161,13 @@ export default function Home() {
 
   const totalPortfolioValue = tokenAssets.reduce((sum, item) => sum + item.valueUsd, 0);
 
-  // Function Mengambil Live Price dari DexScreener API
   const fetchLivePricesAndBalances = useCallback(async (userAddress: string) => {
     setIsFetchingLive(true);
     try {
-      // Ambil harga dari DexScreener untuk token World Chain
       const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3,0x79a60a8438cc914800cbae917621a876b28824d1");
       const data = await res.json();
       
       if (data && data.pairs) {
-        // Update harga WLD & USDC jika tersedia
         const wldPair = data.pairs.find((p: any) => p.baseToken.symbol === "WLD");
         if (wldPair) {
           setTokenAssets(prev => prev.map(t => {
@@ -163,7 +180,7 @@ export default function Home() {
         }
       }
     } catch (error) {
-      console.log("Menggunakan fallback cache harga World Chain:", error);
+      console.log("Fallback harga cache:", error);
     } finally {
       setIsFetchingLive(false);
     }
@@ -189,6 +206,47 @@ export default function Home() {
   }, [fetchLivePricesAndBalances]);
 
   const t = translations[lang];
+
+  const handleCopyAddress = () => {
+    const addr = walletAddress || DEVELOPER_WALLET_ADDRESS;
+    navigator.clipboard.writeText(addr);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendSubmit = async () => {
+    if (!sendRecipient || !sendAmount || parseFloat(sendAmount) <= 0) {
+      alert("Masukkan alamat tujuan dan jumlah token yang valid!");
+      return;
+    }
+
+    if (MiniKit.isInstalled()) {
+      try {
+        const payPayload = {
+          reference: `flip-send-${Date.now()}`,
+          to: sendRecipient,
+          tokens: [
+            {
+              symbol: sendToken === "USDC" ? "USDCE" : sendToken,
+              token_amount: parseFloat(sendAmount).toFixed(4),
+            },
+          ],
+          description: `Transfer ${sendAmount} ${sendToken} via FLIP Wallet`,
+        };
+
+        const res = await (MiniKit.commandsAsync as any).pay(payPayload);
+        console.log("Status Transfer:", res);
+        setShowSendModal(false);
+        setSendAmount("");
+        setSendRecipient("");
+      } catch (error) {
+        console.error("Error Send:", error);
+      }
+    } else {
+      alert(`[Mode Browser]\n\nTransfer ${sendAmount} ${sendToken} ke:\n${sendRecipient}`);
+      setShowSendModal(false);
+    }
+  };
 
   const handleQuickAmount = (percentage: number) => {
     const mockBalance = 10;
@@ -311,7 +369,6 @@ export default function Home() {
         {/* TAB 1: HOME */}
         {activeTab === "home" && (
           <div className="space-y-5 animate-fadeIn">
-            {/* Balance Overview Card */}
             <div className="text-center py-4">
               <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
                 {t.totalBalance}
@@ -335,7 +392,7 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => alert("Fitur Kirim Token (Send) siap diintegrasikan!")}
+                onClick={() => setShowSendModal(true)}
                 className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
               >
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,7 +402,7 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => alert(`Alamat QR Dompet Anda:\n${walletAddress || DEVELOPER_WALLET_ADDRESS}`)}
+                onClick={() => setShowReceiveModal(true)}
                 className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
               >
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -521,11 +578,97 @@ export default function Home() {
 
       </div>
 
+      {/* MODAL TERIMA (RECEIVE) */}
+      {showReceiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.receiveTitle}</h3>
+              <button onClick={() => setShowReceiveModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl inline-block shadow-xl">
+              {/* Dummy QR Placeholder */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${walletAddress || DEVELOPER_WALLET_ADDRESS}`}
+                alt="Wallet QR Code"
+                className="w-40 h-40 mx-auto"
+              />
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs break-all text-slate-300 font-mono">
+              {walletAddress || DEVELOPER_WALLET_ADDRESS}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyAddress}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              {copied ? t.addressCopied : t.copyAddress}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KIRIM (SEND) */}
+      {showSendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.sendTitle}</h3>
+              <button onClick={() => setShowSendModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 mb-1 block">{t.recipientAddress}</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={sendRecipient}
+                  onChange={(e) => setSendRecipient(e.target.value)}
+                  className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 mb-1 block">{t.amountLabel}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="0.0"
+                    value={sendAmount}
+                    onChange={(e) => setSendAmount(e.target.value)}
+                    className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-emerald-500"
+                  />
+                  <select
+                    value={sendToken}
+                    onChange={(e) => setSendToken(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="WLD">WLD</option>
+                    <option value="USDC">USDC</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSendSubmit}
+              className="w-full mt-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              {t.btnSendNow}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* BOTTOM NAVIGATION BAR */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-4 py-2 z-50 flex justify-center pb-safe">
         <div className="w-full max-w-md flex justify-around items-center">
           
-          {/* TAB HOME */}
           <button
             type="button"
             onClick={() => setActiveTab("home")}
@@ -541,7 +684,6 @@ export default function Home() {
             <span className="text-[10px] tracking-wide">{t.home}</span>
           </button>
 
-          {/* TAB SWAP */}
           <button
             type="button"
             onClick={() => setActiveTab("swap")}
@@ -557,7 +699,6 @@ export default function Home() {
             <span className="text-[10px] tracking-wide">{t.swap}</span>
           </button>
 
-          {/* TAB EXPLORE */}
           <button
             type="button"
             onClick={() => setActiveTab("explore")}
