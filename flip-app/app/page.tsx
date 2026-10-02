@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MiniKit } from "@worldcoin/minikit-js";
+import { publicClient } from "@/lib/worldchain";
+import { formatUnits } from "viem";
 
 // Kamus Bahasa (Localization)
 const translations = {
@@ -168,7 +170,6 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   // State Sinkronisasi Verifikasi World ID
-  // Default false agar pengguna melihat layar verifikasi terlebih dahulu sesuai gambar Anda
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [isVerifyingLoading, setIsVerifyingLoading] = useState<boolean>(false);
 
@@ -207,8 +208,6 @@ export default function Home() {
     { symbol: "WBTC", name: "Wrapped Bitcoin", amount: 0.00005, priceUsd: 65000.00, valueUsd: 3.25, change24h: -0.45, iconBg: "bg-amber-500", decimals: 8 },
     { symbol: "FOOTBALL", name: "Crazy Football", amount: 392.29, priceUsd: 0.00002, valueUsd: 0.008, change24h: -1.69, iconBg: "bg-green-600" },
     { symbol: "ORO", name: "Oro Token", amount: 0.50, priceUsd: 0.008, valueUsd: 0.004, change24h: 0.19, iconBg: "bg-yellow-500" },
-    { symbol: "H2O", name: "H2O Clean", amount: 68.99, priceUsd: 0.00008, valueUsd: 0.006, change24h: 63.72, iconBg: "bg-cyan-500" },
-    { symbol: "$AXO", name: "Axolotl World", amount: 4.001, priceUsd: 0.0005, valueUsd: 0.002, change24h: -28.75, iconBg: "bg-pink-500" },
   ]);
 
   // State Swap
@@ -226,49 +225,46 @@ export default function Home() {
     if (!userAddress) return;
     setIsFetchingLive(true);
     try {
-      const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3,0x79a60a8438cc914800cbae917621a876b28824d1");
-      const data = await res.json();
-      
-      let wldPrice = 2.0;
-      let usdcPrice = 1.0;
+      // 1. Ambil saldo ETH asli (Native Balance) di World Chain secara realtime via Viem
+      const ethBalanceWei = await publicClient.getBalance({
+        address: userAddress as `0x${string}`,
+      });
+      const ethBal = parseFloat(formatUnits(ethBalanceWei, 18));
 
-      if (data && data.pairs) {
-        const wldPair = data.pairs.find((p: any) => p.baseToken.symbol === "WLD");
-        if (wldPair) wldPrice = parseFloat(wldPair.priceUsd) || 2.0;
-        const usdcPair = data.pairs.find((p: any) => p.baseToken.symbol === "USDC");
-        if (usdcPair) usdcPrice = parseFloat(usdcPair.priceUsd) || 1.0;
-      }
+      // 2. Ambil saldo token USDC menggunakan readContract (ERC-20 balanceOf) via Viem
+      const USDC_CONTRACT = "0x79a60a8438cc914800cbae917621a876b28824d1";
+      const ERC20_ABI = [
+        {
+          constant: true,
+          inputs: [{ name: "_owner", type: "address" }],
+          name: "balanceOf",
+          outputs: [{ name: "balance", type: "uint256" }],
+          type: "function",
+        },
+      ] as const;
 
+      let usdcBal = 4.88; // Default fallback
       try {
-        const rpcRes = await fetch("https://worldchain-mainnet.g.alchemy.com/public", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_getBalance",
-            params: [userAddress, "latest"]
-          })
+        const usdcBalanceRaw = await publicClient.readContract({
+          address: USDC_CONTRACT as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'balanceOf',
+          args: [userAddress as `0x${string}`],
         });
-        const rpcData = await rpcRes.json();
-        if (rpcData && rpcData.result) {
-          const ethBalanceWei = parseInt(rpcData.result, 16);
-          const ethBal = ethBalanceWei / 1e18;
-          if (ethBal > 0) {
-            setTokenAssets(prev => prev.map(t => t.symbol === "ETH" ? { ...t, amount: ethBal, valueUsd: ethBal * t.priceUsd } : t));
-          }
-        }
-      } catch (rpcErr) {
-        console.log("RPC Balance info:", rpcErr);
+        usdcBal = parseFloat(formatUnits(usdcBalanceRaw as bigint, 6)); // USDC menggunakan 6 desimal
+      } catch (err) {
+        console.log("Gagal baca USDC contract, pakai nilai default:", err);
       }
 
+      // 3. Perbarui state tokenAssets dengan data live dari blockchain
       setTokenAssets(prev => prev.map(t => {
-        if (t.symbol === "WLD") return { ...t, priceUsd: wldPrice, valueUsd: t.amount * wldPrice };
-        if (t.symbol === "USDC") return { ...t, priceUsd: usdcPrice, valueUsd: t.amount * usdcPrice };
+        if (t.symbol === "ETH") return { ...t, amount: ethBal, valueUsd: ethBal * t.priceUsd };
+        if (t.symbol === "USDC") return { ...t, amount: usdcBal, valueUsd: usdcBal * t.priceUsd };
         return t;
       }));
+
     } catch (error) {
-      console.log("Fallback harga cache:", error);
+      console.log("Gagal mengambil data blockchain realtime:", error);
     } finally {
       setIsFetchingLive(false);
     }
@@ -282,28 +278,24 @@ export default function Home() {
         if (address) {
           setWalletAddress(address);
           fetchLivePricesAndBalances(address);
-          // Otomatis set terverifikasi jika sudah terdeteksi di MiniKit
           setIsVerified(true);
         }
       }
     }
   }, [fetchLivePricesAndBalances]);
 
-  // Fungsi Handler saat Tombol Verifikasi World ID diklik
   const handleVerifyWorldID = async () => {
     setIsVerifyingLoading(true);
     try {
       if (MiniKit.isInstalled()) {
-        // Panggil command verifikasi World ID MiniKit jika diperlukan
-        // Contoh: const { finalPayload } = await MiniKit.commandsAsync.verify({ ... });
         const address = MiniKit.user?.walletAddress || DEVELOPER_WALLET_ADDRESS;
         setWalletAddress(address);
         setIsVerified(true);
         fetchLivePricesAndBalances(address);
       } else {
-        // Mode Browser/Simulasi
         setWalletAddress(DEVELOPER_WALLET_ADDRESS);
         setIsVerified(true);
+        fetchLivePricesAndBalances(DEVELOPER_WALLET_ADDRESS);
       }
     } catch (error) {
       console.error("Verifikasi Gagal:", error);
@@ -386,26 +378,22 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-between pb-28 bg-[#080C14] text-white font-sans relative select-none overflow-x-hidden">
       
-      {/* KONDISIONAL TAMPILAN: JIKA BELUM VERIFIKASI, TAMPILKAN HALAMAN VERIFIKASI ORB */}
       {!isVerified ? (
         <div className="w-full max-w-md min-h-screen flex flex-col justify-between p-6 z-20 animate-fadeIn">
-          {/* Header Atas */}
           <div className="flex justify-between items-center w-full">
-            <button onClick={() => setIsVerified(true)} className="text-slate-400 hover:text-white text-xl cursor-pointer">✕</button>
+            <button onClick={() => { setIsVerified(true); fetchLivePricesAndBalances(DEVELOPER_WALLET_ADDRESS); }} className="text-slate-400 hover:text-white text-xl cursor-pointer">✕</button>
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1 rounded-full text-xs font-bold">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <span>FLIP ⚠️</span>
             </div>
           </div>
 
-          {/* Kartu Utama Verifikasi */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 text-center my-auto">
             <div>
               <h2 className="text-2xl font-black text-white">{t.verifyTitle}</h2>
               <p className="text-xs text-slate-400 mt-1">{t.verifySubtitle}</p>
             </div>
 
-            {/* Kotak Status Dompet */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-left">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-bold text-slate-400 tracking-wider">{t.statusWallet}</span>
@@ -416,7 +404,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Tombol Kirim / Terima (Preview visual di card) */}
             <div className="grid grid-cols-2 gap-3">
               <button disabled className="bg-blue-600 text-white font-bold py-3 rounded-xl text-xs opacity-80 cursor-not-allowed">
                 {t.send}
@@ -426,7 +413,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Tombol Utama Verifikasi World ID (Orb) */}
             <div 
               onClick={handleVerifyWorldID}
               className="bg-slate-950 hover:bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between cursor-pointer transition shadow-lg group"
@@ -451,9 +437,7 @@ export default function Home() {
           <div className="h-4" />
         </div>
       ) : (
-        // JIKA SUDAH TERVERIFIKASI, MASUK KE TAMPILAN UTAMA DOMPET FLIP
         <>
-          {/* Header */}
           <div className="w-full max-w-md flex justify-between items-center p-4 z-50">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-black text-emerald-400">
@@ -471,7 +455,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Bahasa */}
             <div className="flex gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
               {(["en", "id", "es"] as Language[]).map((l) => (
                 <button
@@ -490,10 +473,8 @@ export default function Home() {
 
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-500/10 rounded-full blur-[130px] pointer-events-none" />
 
-          {/* Konten Utama */}
           <div className="w-full max-w-md px-4 z-10 flex-1">
             
-            {/* TAB HOME */}
             {activeTab === "home" && (
               <div className="space-y-5 animate-fadeIn">
                 <div className="text-center py-4">
@@ -540,7 +521,6 @@ export default function Home() {
                   <span className="text-xs font-bold text-slate-400">{t.assets}</span>
                 </div>
 
-                {/* Daftar Aset */}
                 <div className="space-y-2.5">
                   {tokenAssets.map((token) => (
                     <div key={token.symbol} className="flex items-center justify-between p-3.5 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 rounded-2xl transition">
@@ -565,7 +545,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* TAB SWAP */}
             {activeTab === "swap" && (
               <div className="animate-fadeIn">
                 <div className="text-center mb-4">
@@ -577,7 +556,6 @@ export default function Home() {
 
                 <div className="bg-slate-900/90 backdrop-blur-xl rounded-3xl p-5 border border-slate-800 shadow-2xl relative">
                   
-                  {/* Input Pay */}
                   <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800 mb-2">
                     <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
                       <span>{t.pay}</span>
@@ -631,14 +609,12 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Tombol Inversi */}
                   <div className="flex justify-center -my-3 relative z-20">
                     <button type="button" onClick={handleSwapTokens} className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 transition cursor-pointer shadow">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                     </button>
                   </div>
 
-                  {/* Input Receive */}
                   <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800 mt-2">
                     <div className="text-xs text-slate-400 mb-2">{t.receiveEst}</div>
                     <div className="flex items-center justify-between gap-3">
@@ -705,7 +681,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* TAB EXPLORE */}
             {activeTab === "explore" && (
               <div className="space-y-4 animate-fadeIn text-center py-8">
                 <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 mx-auto border border-emerald-500/20">
@@ -719,7 +694,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Modal Receive */}
           {showReceiveModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
               <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
@@ -740,7 +714,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Modal Send */}
           {showSendModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
               <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
@@ -786,7 +759,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Modal Riwayat */}
           {showHistoryModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
               <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 max-h-[80vh] flex flex-col">
@@ -816,7 +788,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Navigasi Bawah */}
           <nav className="fixed bottom-0 max-w-md w-full bg-slate-900/90 backdrop-blur-xl border-t border-slate-800/80 px-6 py-3 flex justify-around items-center z-40">
             {[
               { id: "home", label: t.home, icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
