@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createPublicClient, http, formatEther } from 'viem';
+import { createPublicClient, http, formatEther, getAddress } from 'viem';
 import { worldchain } from 'viem/chains';
 
 // Public RPC Client untuk World Chain Mainnet
 const publicClient = createPublicClient({
   chain: worldchain,
-  transport: http('https://rpc.worldchain.org'),
+  transport: http('https://worldchain-mainnet.g.alchemy.com/public'),
 });
 
-// Alamat Kontrak Token WLD di World Chain
-const WLD_CONTRACT = '0x2cf8bf4ded589b166eeee1066c6293202b1c4002';
+// Alamat Kontrak Token WLD di World Chain (dengan Checksum yang valid)
+const WLD_CONTRACT = getAddress('0x2cf8bf4ded589b166eeee1066c6293202b1c4002');
 
 // Minimal ABI untuk membaca saldo ERC-20
 const erc20Abi = [
@@ -38,22 +38,24 @@ export default function BalanceCard({ address }: BalanceCardProps) {
 
     setIsLoading(true);
     try {
-      // 1. Ambil Saldo Native ETH
+      const formattedAddress = getAddress(address);
+
+      // 1. Ambil Saldo Native ETH secara parallel/aman
       const rawEth = await publicClient.getBalance({
-        address: address as `0x${string}`,
+        address: formattedAddress,
       });
       setEthBalance(Number(formatEther(rawEth)).toFixed(4));
 
       // 2. Ambil Saldo Token WLD
       const rawWld = await publicClient.readContract({
-        address: WLD_CONTRACT as `0x${string}`,
+        address: WLD_CONTRACT,
         abi: erc20Abi,
         functionName: 'balanceOf',
-        args: [address as `0x${string}`],
+        args: [formattedAddress],
       });
       setWldBalance(Number(formatEther(rawWld as bigint)).toFixed(2));
     } catch (error) {
-      console.error('Gagal mengambil saldo:', error);
+      console.error('Gagal mengambil saldo blockchain:', error);
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +80,7 @@ export default function BalanceCard({ address }: BalanceCardProps) {
         <button
           onClick={fetchBalances}
           disabled={isLoading}
-          className="text-[11px] text-slate-400 hover:text-emerald-300 transition-colors"
+          className="text-[11px] text-slate-400 hover:text-emerald-300 transition-colors cursor-pointer"
         >
           {isLoading ? 'Memuat...' : '🔄 Refresh'}
         </button>
