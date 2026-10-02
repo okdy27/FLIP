@@ -14,12 +14,12 @@ export default function WalletHeader() {
 
     try {
       if (!MiniKit.isInstalled()) {
-        setErrorMessage('Buka aplikasi ini di dalam World App Simulator.');
+        setErrorMessage('Silakan buka aplikasi ini di dalam World App.');
         setIsConnecting(false);
         return;
       }
 
-      // 1. Cek jika alamat dompet sudah tersedia di instance MiniKit
+      // 1. Cek jika alamat dompet sudah tersimpan di MiniKit
       const existingAddress =
         (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
 
@@ -29,13 +29,13 @@ export default function WalletHeader() {
         return;
       }
 
-      // 2. Memicu POP-UP Native World App Koneksi Dompet (Wallet Auth)
+      // 2. Memanggil POP-UP Native World App untuk koneksi dompet (Wallet Auth / SIWE)
       const nonce = Math.random().toString(36).substring(2, 15);
-      
+
       const authRes = await (MiniKit as any).commandsAsync?.walletAuth({
         nonce: nonce,
         requestId: `flip-auth-${Date.now()}`,
-        expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 Hari
+        expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         statement: 'Hubungkan dompet World ID Anda ke FLIP Wallet & Swap',
       });
 
@@ -63,7 +63,7 @@ export default function WalletHeader() {
     }
   }, []);
 
-  // Pop-up otomatis dipicu saat aplikasi pertama kali dimuat di Simulator World App
+  // Memunculkan pop-up koneksi secara otomatis saat pertama kali dimuat di World App
   useEffect(() => {
     if (MiniKit.isInstalled() && !walletAddress) {
       connectWorldIDWallet();
