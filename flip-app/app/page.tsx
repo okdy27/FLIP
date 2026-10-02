@@ -31,7 +31,6 @@ const translations = {
     trust: "🔒 Secure & Verified on World Network",
     previewTitle: "[Browser Preview Mode]",
     connectWallet: "Connect World App Wallet",
-    walletConnected: "Connected:",
   },
   id: {
     home: "Beranda",
@@ -59,7 +58,6 @@ const translations = {
     trust: "🔒 Aman & Terverifikasi di World Network",
     previewTitle: "[Pratinjau Mode Browser]",
     connectWallet: "Hubungkan Dompet World App",
-    walletConnected: "Terhubung:",
   },
   es: {
     home: "Inicio",
@@ -87,7 +85,6 @@ const translations = {
     trust: "🔒 Seguro y Verificado en World Network",
     previewTitle: "[Vista Previa del Navegador]",
     connectWallet: "Conectar Billetera World App",
-    walletConnected: "Conectado:",
   },
 };
 
@@ -108,17 +105,17 @@ export default function Home() {
   const [lang, setLang] = useState<Language>("en");
   const [walletAddress, setWalletAddress] = useState<string>("");
   
-  // State untuk Swap
+  // State Swap
   const [amount, setAmount] = useState("");
   const [fromToken, setFromToken] = useState("WLD");
   const [toToken, setToToken] = useState("USDC");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Alamat Project Wallet Penerima Komisi Swap 0.3%
+  // Alamat Wallet Project FLIP Penerima Komisi Swap 0.3%
   const DEVELOPER_WALLET_ADDRESS = "0xd082493b467bb13c44aafa6e50de3d63f11e68ec";
   const FEE_PERCENTAGE = 0.003;
 
-  // Mock Daftar Token World Chain (Sesuai sampel Ani Wallet)
+  // Mock Daftar Token World Chain
   const tokenAssets: TokenAsset[] = [
     { symbol: "WLD", name: "Worldcoin", amount: 4.25, valueUsd: 8.50, change24h: 3.45, iconBg: "bg-emerald-500" },
     { symbol: "USDC", name: "USD Coin", amount: 4.88, valueUsd: 4.88, change24h: 0.01, iconBg: "bg-blue-500" },
@@ -130,7 +127,6 @@ export default function Home() {
 
   const totalPortfolioValue = tokenAssets.reduce((sum, item) => sum + item.valueUsd, 0);
 
-  // Inisialisasi MiniKit & Deteksi Wallet
   useEffect(() => {
     if (typeof window !== "undefined") {
       MiniKit.install();
@@ -206,9 +202,9 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between pb-24 bg-[#080C14] text-white font-sans relative select-none overflow-x-hidden">
+    <main className="flex min-h-screen flex-col items-center justify-between pb-28 bg-[#080C14] text-white font-sans relative select-none overflow-x-hidden">
       
-      {/* Top Header & Language Selector */}
+      {/* Top Header */}
       <div className="w-full max-w-md flex justify-between items-center p-4 z-50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-black text-emerald-400">
@@ -264,10 +260,10 @@ export default function Home() {
       {/* Background Glow Effect */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-500/10 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* KONTEN UTAMA SESUAI TAB */}
+      {/* KONTEN UTAMA */}
       <div className="w-full max-w-md px-4 z-10 flex-1">
         
-        {/* TAB 1: HOME (DOMPET & PORTOFOLIO) */}
+        {/* TAB 1: HOME */}
         {activeTab === "home" && (
           <div className="space-y-5 animate-fadeIn">
             {/* Balance Overview Card */}
@@ -284,27 +280,31 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Action Buttons (Send / Receive / Swap) */}
+            {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => alert("Fitur Kirim Token (Send) siap diintegrasikan!")}
-                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition"
+                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
               >
-                <span className="p-1.5 bg-slate-800 rounded-lg">↗</span>
+                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                </svg>
                 {t.send}
               </button>
               <button
                 type="button"
                 onClick={() => alert(`Alamat QR Dompet Anda:\n${walletAddress || DEVELOPER_WALLET_ADDRESS}`)}
-                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition"
+                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
               >
-                <span className="p-1.5 bg-slate-800 rounded-lg">↙</span>
+                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
+                </svg>
                 {t.receive}
               </button>
             </div>
 
-            {/* Filter Section (Network & Asset) */}
+            {/* Filter Section */}
             <div className="flex justify-between items-center pt-2">
               <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -313,7 +313,7 @@ export default function Home() {
               <span className="text-xs font-bold text-slate-400">{t.assets}</span>
             </div>
 
-            {/* Daftar Aset / Token (World Chain List) */}
+            {/* Daftar Aset */}
             <div className="space-y-2.5">
               {tokenAssets.map((token) => (
                 <div
@@ -343,7 +343,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB 2: SWAP (FITUR SWAP FLIP SEBELUMNYA) */}
+        {/* TAB 2: SWAP */}
         {activeTab === "swap" && (
           <div className="animate-fadeIn">
             <div className="text-center mb-4">
@@ -354,7 +354,6 @@ export default function Home() {
             </div>
 
             <div className="bg-slate-900/90 backdrop-blur-xl rounded-3xl p-5 border border-slate-800 shadow-2xl">
-              {/* Savings Banner */}
               <div className="mb-4 p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 text-emerald-300 font-medium">
                   <span>💡</span>
@@ -399,9 +398,11 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleSwapTokens}
-                  className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 transition shadow-md"
+                  className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 transition shadow-md cursor-pointer"
                 >
-                  ↓↑
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
                 </button>
               </div>
 
@@ -426,7 +427,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Fee Breakdown */}
               <div className="mt-4 p-3 bg-slate-950/50 rounded-2xl border border-slate-800/60 space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-400">
                   <span>{t.feeLabel}</span>
@@ -444,7 +444,7 @@ export default function Home() {
                 type="button"
                 onClick={handleSwap}
                 disabled={isLoading}
-                className="w-full mt-5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                className="w-full mt-5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? t.btnProcessing : t.btnSwap}
               </button>
@@ -455,8 +455,11 @@ export default function Home() {
         {/* TAB 3: EXPLORE */}
         {activeTab === "explore" && (
           <div className="space-y-4 animate-fadeIn text-center py-8">
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 text-2xl mx-auto border border-emerald-500/20">
-              🚀
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 mx-auto border border-emerald-500/20">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
             </div>
             <h3 className="text-xl font-extrabold text-white">World Chain Ecosystem</h3>
             <p className="text-xs text-slate-400 max-w-xs mx-auto">
@@ -467,41 +470,56 @@ export default function Home() {
 
       </div>
 
-      {/* BOTTOM NAVIGATION BAR (Sesuai Tampilan Ani Wallet) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 p-2 z-50 flex justify-center">
+      {/* PRO-GRADE SVG BOTTOM NAVIGATION BAR */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-4 py-2 z-50 flex justify-center pb-safe">
         <div className="w-full max-w-md flex justify-around items-center">
           
+          {/* TAB HOME */}
           <button
             type="button"
             onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl transition ${
-              activeTab === "home" ? "text-emerald-400 font-bold" : "text-slate-500 hover:text-slate-300"
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "home" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
             }`}
           >
-            <span className="text-lg">🏠</span>
-            <span className="text-[10px]">{t.home}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "home" ? "2.5" : "2"} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.home}</span>
           </button>
 
+          {/* TAB SWAP */}
           <button
             type="button"
             onClick={() => setActiveTab("swap")}
-            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl transition ${
-              activeTab === "swap" ? "text-emerald-400 font-bold" : "text-slate-500 hover:text-slate-300"
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "swap" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
             }`}
           >
-            <span className="text-lg">🔄</span>
-            <span className="text-[10px]">{t.swap}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "swap" ? "2.5" : "2"} d="M8 7h12m0 0l-4-4m4 4l-4 4m-8 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.swap}</span>
           </button>
 
+          {/* TAB EXPLORE */}
           <button
             type="button"
             onClick={() => setActiveTab("explore")}
-            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl transition ${
-              activeTab === "explore" ? "text-emerald-400 font-bold" : "text-slate-500 hover:text-slate-300"
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "explore" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
             }`}
           >
-            <span className="text-lg">🧩</span>
-            <span className="text-[10px]">{t.explore}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "explore" ? "2.5" : "2"} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.explore}</span>
           </button>
 
         </div>
