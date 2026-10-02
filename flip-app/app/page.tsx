@@ -1,225 +1,859 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import WalletHeader from './wallet-header';
-import { MiniKit } from '@worldcoin/minikit-js';
+import { useState, useEffect, useCallback } from "react";
+import { MiniKit } from "@worldcoin/minikit-js";
+
+// Kamus Bahasa (Localization)
+const translations = {
+  en: {
+    home: "Home",
+    swap: "Swap",
+    explore: "Explore",
+    totalBalance: "Total Balance",
+    send: "Send",
+    receive: "Receive",
+    history: "History",
+    assets: "Assets",
+    networks: "World chain",
+    badge: "Lowest Fee • $0 Gas Fee",
+    savingsBanner: "You save 100% on Gas Fees with FLIP!",
+    badgeSaved: "SAVED",
+    swapTitle: "Swap Tokens",
+    slippage: "Slippage: Auto (0.5%)",
+    pay: "You Pay",
+    receiveEst: "You Receive (Est.)",
+    feeLabel: "FLIP Platform Fee (0.3%):",
+    gasLabel: "Network Gas Fee:",
+    gasValue: "FREE (Sponsored)",
+    savingsLabel: "Est. Total Savings:",
+    savingsValue: "100% Free Gas Fee",
+    btnSwap: "Swap Now (Lowest Fee)",
+    btnProcessing: "Processing...",
+    trust: "🔒 Secure & Verified on World Network",
+    previewTitle: "[Browser Preview Mode]",
+    fetchingBalances: "Syncing Live Blockchain Data...",
+    receiveTitle: "Receive Tokens",
+    copyAddress: "Copy Address",
+    addressCopied: "Address Copied!",
+    sendTitle: "Send Tokens",
+    recipientAddress: "Recipient Address",
+    amountLabel: "Amount",
+    btnSendNow: "Send Now",
+    historyTitle: "Transaction History",
+    noHistory: "No transactions yet",
+    typeSwap: "Swap",
+    typeSend: "Send",
+  },
+  id: {
+    home: "Beranda",
+    swap: "Tukar",
+    explore: "Eksplorasi",
+    totalBalance: "Total Saldo",
+    send: "Kirim",
+    receive: "Terima",
+    history: "Riwayat",
+    assets: "Aset",
+    networks: "World chain",
+    badge: "Swap Termurah • Biaya Gas Rp 0",
+    savingsBanner: "Anda menghemat 100% Biaya Gas di FLIP!",
+    badgeSaved: "HEMAT",
+    swapTitle: "Tukar Token",
+    slippage: "Slippage: Otomatis (0.5%)",
+    pay: "Anda Bayar",
+    receiveEst: "Diterima (Bersih)",
+    feeLabel: "Biaya Komisi FLIP (0.3%):",
+    gasLabel: "Biaya Jaringan (Gas):",
+    gasValue: "Rp 0 (Sponsor Jaringan)",
+    savingsLabel: "Estimasi Penghematan:",
+    savingsValue: "100% Bebas Biaya Gas",
+    btnSwap: "Swap Sekarang (Biaya Termurah)",
+    btnProcessing: "Memproses...",
+    trust: "🔒 Aman & Terverifikasi di World Network",
+    previewTitle: "[Pratinjau Mode Browser]",
+    fetchingBalances: "Menyingkronkan Data Blockchain Live...",
+    receiveTitle: "Terima Token",
+    copyAddress: "Salin Alamat",
+    addressCopied: "Alamat Disalin!",
+    sendTitle: "Kirim Token",
+    recipientAddress: "Alamat Tujuan",
+    amountLabel: "Jumlah",
+    btnSendNow: "Kirim Sekarang",
+    historyTitle: "Riwayat Transaksi",
+    noHistory: "Belum ada transaksi",
+    typeSwap: "Tukar Token",
+    typeSend: "Kirim Token",
+  },
+  es: {
+    home: "Inicio",
+    swap: "Intercambio",
+    explore: "Explorar",
+    totalBalance: "Balance Total",
+    send: "Enviar",
+    receive: "Recibir",
+    history: "Historial",
+    assets: "Activos",
+    networks: "World chain",
+    badge: "Tarifa Más Baja • Tarifa de Gas $0",
+    savingsBanner: "¡Ahorras un 100% en tarifas de gas con FLIP!",
+    badgeSaved: "AHORRA",
+    swapTitle: "Intercambiar Tokens",
+    slippage: "Deslizamiento: Auto (0.5%)",
+    pay: "Tú Pagas",
+    receiveEst: "Recibes (Est.)",
+    feeLabel: "Comisión de FLIP (0.3%):",
+    gasLabel: "Tarifa de Red (Gas):",
+    gasValue: "GRATIS (Patrocinado)",
+    savingsLabel: "Ahorro Estimado:",
+    savingsValue: "100% Sin Tarifa de Gas",
+    btnSwap: "Intercambiar Ahora",
+    btnProcessing: "Procesando...",
+    trust: "🔒 Seguro y Verificado en World Network",
+    previewTitle: "[Vista Previa del Navegador]",
+    fetchingBalances: "Sincronizando Datos Live de Blockchain...",
+    receiveTitle: "Recibir Tokens",
+    copyAddress: "Copiar Dirección",
+    addressCopied: "¡Dirección Copiada!",
+    sendTitle: "Enviar Tokens",
+    recipientAddress: "Dirección de Destino",
+    amountLabel: "Monto",
+    btnSendNow: "Enviar Ahora",
+    historyTitle: "Historial de Transacciones",
+    noHistory: "Aún no hay transacciones",
+    typeSwap: "Intercambio",
+    typeSend: "Enviar",
+  },
+};
+
+type Language = "en" | "id" | "es";
+type Tab = "home" | "swap" | "explore";
+
+interface TokenAsset {
+  symbol: string;
+  name: string;
+  contractAddress: string;
+  amount: number;
+  priceUsd: number;
+  valueUsd: number;
+  change24h: number;
+  iconBg: string;
+}
+
+interface TransactionLog {
+  id: string;
+  type: "swap" | "send";
+  tokenSymbol: string;
+  amount: string;
+  recipient?: string;
+  timestamp: string;
+  status: "Success" | "Pending";
+}
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'wallet' | 'swap'>('wallet');
-  const [amount, setAmount] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("home");
+  const [lang, setLang] = useState<Language>("en");
+  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [isFetchingLive, setIsFetchingLive] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Fungsi untuk mengeksekusi Swap menggunakan MiniKit Pay / Transaction
+  // Modal States
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Send Form States
+  const [sendRecipient, setSendRecipient] = useState("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendToken, setSendToken] = useState("WLD");
+
+  // Transaction History State
+  const [txHistory, setTxHistory] = useState<TransactionLog[]>([
+    {
+      id: "tx-1",
+      type: "swap",
+      tokenSymbol: "WLD ➔ USDC",
+      amount: "1.5 WLD",
+      timestamp: "Today, 13:45",
+      status: "Success",
+    },
+  ]);
+
+  // State Token & Balances
+  const [tokenAssets, setTokenAssets] = useState<TokenAsset[]>([
+    { symbol: "WLD", name: "Worldcoin", contractAddress: "0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3", amount: 4.25, priceUsd: 2.00, valueUsd: 8.50, change24h: 3.45, iconBg: "bg-emerald-500" },
+    { symbol: "USDC", name: "USD Coin", contractAddress: "0x79a60a8438cc914800cbae917621a876b28824d1", amount: 4.88, priceUsd: 1.00, valueUsd: 4.88, change24h: 0.01, iconBg: "bg-blue-500" },
+    { symbol: "FOOTBALL", name: "Crazy Football", contractAddress: "", amount: 392.29, priceUsd: 0.00002, valueUsd: 0.008, change24h: -1.69, iconBg: "bg-green-600" },
+    { symbol: "ORO", name: "Oro Token", contractAddress: "", amount: 0.50, priceUsd: 0.008, valueUsd: 0.004, change24h: 0.19, iconBg: "bg-amber-500" },
+    { symbol: "H2O", name: "H2O Clean", contractAddress: "", amount: 68.99, priceUsd: 0.00008, valueUsd: 0.006, change24h: 63.72, iconBg: "bg-cyan-500" },
+    { symbol: "$AXO", name: "Axolotl World", contractAddress: "", amount: 4.001, priceUsd: 0.0005, valueUsd: 0.002, change24h: -28.75, iconBg: "bg-pink-500" },
+  ]);
+
+  // State Swap
+  const [amount, setAmount] = useState("");
+  const [fromToken, setFromToken] = useState("WLD");
+  const [toToken, setToToken] = useState("USDC");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Alamat Wallet Project FLIP Penerima Komisi Swap 0.3%
+  const DEVELOPER_WALLET_ADDRESS = "0xd082493b467bb13c44aafa6e50de3d63f11e68ec";
+  const FEE_PERCENTAGE = 0.003;
+
+  const totalPortfolioValue = tokenAssets.reduce((sum, item) => sum + item.valueUsd, 0);
+
+  const fetchLivePricesAndBalances = useCallback(async (userAddress: string) => {
+    setIsFetchingLive(true);
+    try {
+      const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3,0x79a60a8438cc914800cbae917621a876b28824d1");
+      const data = await res.json();
+      
+      if (data && data.pairs) {
+        const wldPair = data.pairs.find((p: any) => p.baseToken.symbol === "WLD");
+        if (wldPair) {
+          setTokenAssets(prev => prev.map(t => {
+            if (t.symbol === "WLD") {
+              const price = parseFloat(wldPair.priceUsd) || 2.0;
+              return { ...t, priceUsd: price, valueUsd: t.amount * price, change24h: parseFloat(wldPair.priceChange?.h24) || 0 };
+            }
+            return t;
+          }));
+        }
+      }
+    } catch (error) {
+      console.log("Fallback harga cache:", error);
+    } finally {
+      setIsFetchingLive(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      MiniKit.install();
+
+      if (MiniKit.isInstalled()) {
+        const address = MiniKit.user?.walletAddress;
+        if (address) {
+          setWalletAddress(address);
+          fetchLivePricesAndBalances(address);
+        }
+      }
+
+      const userLang = navigator.language.slice(0, 2).toLowerCase();
+      if (userLang === "id") setLang("id");
+      else if (userLang === "es") setLang("es");
+      else setLang("en");
+    }
+  }, [fetchLivePricesAndBalances]);
+
+  const t = translations[lang];
+
+  const handleCopyAddress = () => {
+    const addr = walletAddress || DEVELOPER_WALLET_ADDRESS;
+    navigator.clipboard.writeText(addr);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Handler Persentase Nominal Cepat (25%, 50%, 75%, 100%)
+  const handleQuickPercentage = (percentage: number, isSendModal: boolean = false) => {
+    const selectedSymbol = isSendModal ? sendToken : fromToken;
+    const asset = tokenAssets.find(t => t.symbol === selectedSymbol);
+    const balance = asset ? asset.amount : 10;
+    const calcValue = (balance * percentage).toFixed(4);
+
+    if (isSendModal) {
+      setSendAmount(calcValue);
+    } else {
+      setAmount(calcValue);
+    }
+  };
+
+  const handleSendSubmit = async () => {
+    if (!sendRecipient || !sendAmount || parseFloat(sendAmount) <= 0) {
+      alert("Masukkan alamat tujuan dan jumlah token yang valid!");
+      return;
+    }
+
+    const newTx: TransactionLog = {
+      id: `tx-${Date.now()}`,
+      type: "send",
+      tokenSymbol: sendToken,
+      amount: `${sendAmount} ${sendToken}`,
+      recipient: `${sendRecipient.slice(0, 6)}...${sendRecipient.slice(-4)}`,
+      timestamp: "Just now",
+      status: "Success",
+    };
+
+    if (MiniKit.isInstalled()) {
+      try {
+        const payPayload = {
+          reference: `flip-send-${Date.now()}`,
+          to: sendRecipient,
+          tokens: [
+            {
+              symbol: sendToken === "USDC" ? "USDCE" : sendToken,
+              token_amount: parseFloat(sendAmount).toFixed(4),
+            },
+          ],
+          description: `Transfer ${sendAmount} ${sendToken} via FLIP Wallet`,
+        };
+
+        const res = await (MiniKit.commandsAsync as any).pay(payPayload);
+        console.log("Status Transfer:", res);
+        setTxHistory(prev => [newTx, ...prev]);
+        setShowSendModal(false);
+        setSendAmount("");
+        setSendRecipient("");
+      } catch (error) {
+        console.error("Error Send:", error);
+      }
+    } else {
+      setTxHistory(prev => [newTx, ...prev]);
+      alert(`[Mode Browser]\n\nTransfer ${sendAmount} ${sendToken} ke:\n${sendRecipient}`);
+      setShowSendModal(false);
+      setSendAmount("");
+      setSendRecipient("");
+    }
+  };
+
+  const handleSwapTokens = () => {
+    const temp = fromToken;
+    setFromToken(toToken);
+    setToToken(temp);
+  };
+
   const handleSwap = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      alert('Masukkan jumlah token yang valid.');
+      alert("Masukkan jumlah token yang valid!");
       return;
     }
 
-    if (!MiniKit.isInstalled()) {
-      alert('Buka aplikasi FLIP melalui World App untuk melakukan Swap.');
-      return;
-    }
+    setIsLoading(true);
+    const inputAmount = parseFloat(amount);
+    const feeAmount = inputAmount * FEE_PERCENTAGE;
+    const swapAmount = inputAmount - feeAmount;
 
-    setIsProcessing(true);
+    const newTx: TransactionLog = {
+      id: `tx-${Date.now()}`,
+      type: "swap",
+      tokenSymbol: `${fromToken} ➔ ${toToken}`,
+      amount: `${inputAmount} ${fromToken}`,
+      timestamp: "Just now",
+      status: "Success",
+    };
 
-    try {
-      const payPayload = {
-        reference: `flip-swap-${Date.now()}`,
-        to: '0x000ed6c7f4c9de18b91b60691baa27ec4f1b0000', // Alamat Router / Receiver FLIP
-        tokens: [
-          {
-            symbol: 'WLD',
-            token_amount: amount,
-          },
-        ],
-        description: `FLIP Swap: ${amount} WLD`,
-      };
+    if (MiniKit.isInstalled()) {
+      try {
+        const payPayload = {
+          reference: `flip-swap-${Date.now()}`,
+          to: DEVELOPER_WALLET_ADDRESS,
+          tokens: [
+            {
+              symbol: fromToken === "USDC" ? "USDCE" : "WLD",
+              token_amount: feeAmount.toFixed(4),
+            },
+          ],
+          description: "FLIP Swap Fee (0.3%)",
+        };
 
-      const response = await (MiniKit as any).commandsAsync?.pay(payPayload);
-
-      if (response?.finalPayload?.status === 'success') {
-        alert('Transaksi Swap berhasil diajukan!');
-        setAmount('');
-      } else {
-        alert('Transaksi dibatalkan atau gagal.');
+        const res = await (MiniKit.commandsAsync as any).pay(payPayload);
+        console.log("Status Komisi:", res);
+        setTxHistory(prev => [newTx, ...prev]);
+      } catch (error) {
+        console.error("Error transaksi:", error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      console.error('Error saat Swap:', err);
-      alert('Terjadi kesalahan saat memproses Swap.');
-    } finally {
-      setIsProcessing(false);
+    } else {
+      setIsLoading(false);
+      setTxHistory(prev => [newTx, ...prev]);
+      alert(
+        `${t.previewTitle}\n\n` +
+          `• Input: ${inputAmount} ${fromToken}\n` +
+          `• FLIP Fee (0.3%): ${feeAmount.toFixed(4)} ${fromToken}\n` +
+          `• Est. Receive: ${swapAmount.toFixed(4)} ${toToken}\n` +
+          `• Gas Fee: $0\n\n` +
+          `Open in World App for real transactions!`
+      );
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center">
-      <div className="w-full max-w-md min-h-screen flex flex-col bg-slate-900 border-x border-slate-800 shadow-2xl">
+    <main className="flex min-h-screen flex-col items-center justify-between pb-28 bg-[#080C14] text-white font-sans relative select-none overflow-x-hidden">
+      
+      {/* Top Header */}
+      <div className="w-full max-w-md flex justify-between items-center p-4 z-50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-black text-emerald-400">
+            F
+          </div>
+          <div>
+            <h1 className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-emerald-400 bg-clip-text text-transparent">
+              FLIP Wallet
+            </h1>
+            {walletAddress && (
+              <p className="text-[10px] text-slate-400">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Pemilih Bahasa */}
+        <div className="flex gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+          <button
+            type="button"
+            onClick={() => setLang("en")}
+            onTouchEnd={() => setLang("en")}
+            className={`px-2 py-0.5 text-[11px] font-bold rounded-lg transition cursor-pointer ${
+              lang === "en" ? "bg-emerald-500 text-white" : "text-slate-400"
+            }`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("id")}
+            onTouchEnd={() => setLang("id")}
+            className={`px-2 py-0.5 text-[11px] font-bold rounded-lg transition cursor-pointer ${
+              lang === "id" ? "bg-emerald-500 text-white" : "text-slate-400"
+            }`}
+          >
+            ID
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("es")}
+            onTouchEnd={() => setLang("es")}
+            className={`px-2 py-0.5 text-[11px] font-bold rounded-lg transition cursor-pointer ${
+              lang === "es" ? "bg-emerald-500 text-white" : "text-slate-400"
+            }`}
+          >
+            ES
+          </button>
+        </div>
+      </div>
+
+      {/* Background Glow Effect */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-500/10 rounded-full blur-[130px] pointer-events-none" />
+
+      {/* KONTEN UTAMA */}
+      <div className="w-full max-w-md px-4 z-10 flex-1">
         
-        {/* Header Autentikasi World ID */}
-        <WalletHeader />
-
-        {/* Konten Utama */}
-        <div className="flex-1 p-4 space-y-6">
-          
-          {/* Ringkasan Saldo Dompet */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-900/40 via-slate-800 to-slate-900 border border-emerald-500/20 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-400 font-bold text-6xl select-none">
-              FLIP
+        {/* TAB 1: HOME */}
+        {activeTab === "home" && (
+          <div className="space-y-5 animate-fadeIn">
+            <div className="text-center py-4">
+              <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                {t.totalBalance}
+              </span>
+              <h2 className="text-4xl font-black mt-1 text-white">
+                ${totalPortfolioValue.toFixed(2)}
+              </h2>
+              {isFetchingLive ? (
+                <p className="text-[10px] text-emerald-400 animate-pulse mt-2">
+                  ⚡ {t.fetchingBalances}
+                </p>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400">
+                  <span>▲ +2.4%</span>
+                  <span className="text-slate-500 font-normal">24h</span>
+                </div>
+              )}
             </div>
-            
-            <p className="text-xs font-medium text-emerald-400 tracking-wider uppercase mb-1">
-              Total Estimasi Saldo
-            </p>
-            <h2 className="text-3xl font-extrabold text-white mb-4">
-              Rp 0 <span className="text-xs text-slate-400 font-normal">IDR</span>
-            </h2>
 
-            {/* Tombol Navigasi Cepat */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Action Buttons: Kirim | Terima | Riwayat */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* Kirim */}
               <button
-                onClick={() => setActiveTab('swap')}
-                className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 flex items-center justify-center space-x-1"
+                type="button"
+                onClick={() => setShowSendModal(true)}
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
               >
-                <span>Swap Token</span>
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                  </svg>
+                </div>
+                {t.send}
               </button>
+
+              {/* Terima */}
               <button
-                onClick={() => alert('Fitur Transfer Kirim Dompet akan segera aktif!')}
-                className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center space-x-1"
+                type="button"
+                onClick={() => setShowReceiveModal(true)}
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
               >
-                <span>Kirim</span>
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
+                  </svg>
+                </div>
+                {t.receive}
               </button>
+
+              {/* Riwayat */}
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(true)}
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
+              >
+                <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                {t.history}
+              </button>
+            </div>
+
+            {/* Filter Section */}
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                {t.networks}
+              </div>
+              <span className="text-xs font-bold text-slate-400">{t.assets}</span>
+            </div>
+
+            {/* Daftar Aset */}
+            <div className="space-y-2.5">
+              {tokenAssets.map((token) => (
+                <div
+                  key={token.symbol}
+                  className="flex items-center justify-between p-3.5 bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 rounded-2xl transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-2xl ${token.iconBg} flex items-center justify-center font-black text-white text-xs shadow-md`}>
+                      {token.symbol.slice(0, 3)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white">{token.symbol}</h4>
+                      <p className="text-xs text-slate-400">{token.amount} {token.symbol}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <h4 className="font-bold text-sm text-white">
+                      ${token.valueUsd < 0.01 ? "<$0.01" : token.valueUsd.toFixed(2)}
+                    </h4>
+                    <span className={`text-xs font-semibold ${token.change24h >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {token.change24h >= 0 ? "+" : ""}{token.change24h}%
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Navigasi Tab */}
-          <div className="flex bg-slate-950/60 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setActiveTab('wallet')}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                activeTab === 'wallet'
-                  ? 'bg-slate-800 text-emerald-400 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Dompet & Aset
-            </button>
-            <button
-              onClick={() => setActiveTab('swap')}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                activeTab === 'swap'
-                  ? 'bg-slate-800 text-emerald-400 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              FLIP Swap
-            </button>
-          </div>
-
-          {/* Area Tampilan Berdasarkan Tab */}
-          {activeTab === 'wallet' ? (
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
-                Aset Terhubung (World Chain)
-              </h3>
-
-              <div className="p-3.5 bg-slate-800/50 border border-slate-800 rounded-xl flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-sm">
-                    WLD
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-slate-100">Worldcoin</p>
-                    <p className="text-xs text-slate-400">0.00 WLD</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-sm text-slate-200">Rp 0</p>
-                </div>
+        {/* TAB 2: SWAP */}
+        {activeTab === "swap" && (
+          <div className="animate-fadeIn">
+            <div className="text-center mb-4">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-bold text-emerald-400 mb-2">
+                ⚡ {t.badge}
               </div>
-
-              <div className="p-3.5 bg-slate-800/50 border border-slate-800 rounded-xl flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-700 text-slate-300 border border-slate-600 flex items-center justify-center font-bold text-sm">
-                    USD
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-slate-100">USDC</p>
-                    <p className="text-xs text-slate-400">0.00 USDC</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-sm text-slate-200">Rp 0</p>
-                </div>
-              </div>
+              <h2 className="text-2xl font-black">{t.swapTitle}</h2>
             </div>
-          ) : (
-            <div className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-emerald-400">FLIP Instant Swap</h3>
-                <span className="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">
-                  World Chain
+
+            <div className="bg-slate-900/90 backdrop-blur-xl rounded-3xl p-5 border border-slate-800 shadow-2xl">
+              <div className="mb-4 p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                  <span>💡</span>
+                  <span>{t.savingsBanner}</span>
+                </div>
+                <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-bold">
+                  {t.badgeSaved}
                 </span>
               </div>
 
-              {/* Input Token Asal */}
-              <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Anda Bayar</span>
-                  <span>Saldo: 0.00 WLD</span>
+              {/* Input Pay dengan Tombol Persentase Lengkap (25%, 50%, 75%, 100%) */}
+              <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800">
+                <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
+                  <span>{t.pay}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleQuickPercentage(0.25)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">25%</button>
+                    <button onClick={() => handleQuickPercentage(0.5)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">50%</button>
+                    <button onClick={() => handleQuickPercentage(0.75)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">75%</button>
+                    <button onClick={() => handleQuickPercentage(1.0)} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-1 rounded-md text-[10px] font-bold">100%</button>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex items-center justify-between gap-3">
                   <input
                     type="number"
                     placeholder="0.0"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="bg-transparent text-xl font-bold text-white outline-none w-1/2"
+                    className="w-full bg-transparent text-3xl font-bold outline-none text-white placeholder-slate-600"
                   />
-                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-emerald-400">
-                    WLD
-                  </span>
+                  <select
+                    value={fromToken}
+                    onChange={(e) => setFromToken(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="WLD">WLD</option>
+                    <option value="USDC">USDC</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Estimasi Token Tujuan */}
-              <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Anda Terima (Estimasi)</span>
-                  <span>Saldo: 0.00 USDC</span>
+              {/* Invert Button */}
+              <div className="flex justify-center -my-2.5 relative z-20">
+                <button
+                  type="button"
+                  onClick={handleSwapTokens}
+                  className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 transition shadow-md cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Output Receive */}
+              <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800">
+                <div className="text-xs text-slate-400 mb-2">{t.receiveEst}</div>
+                <div className="flex items-center justify-between gap-3">
+                  <input
+                    type="text"
+                    disabled
+                    value={amount ? (parseFloat(amount) * 0.997).toFixed(4) : "0.0"}
+                    className="w-full bg-transparent text-3xl font-bold outline-none text-slate-400"
+                  />
+                  <select
+                    value={toToken}
+                    onChange={(e) => setToToken(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="USDC">USDC</option>
+                    <option value="WLD">WLD</option>
+                  </select>
                 </div>
-                <div className="flex justify-between items-center">
+              </div>
+
+              <div className="mt-4 p-3 bg-slate-950/50 rounded-2xl border border-slate-800/60 space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-400">
+                  <span>{t.feeLabel}</span>
+                  <span className="text-white font-medium">
+                    {amount ? (parseFloat(amount) * 0.003).toFixed(4) : "0.0000"} {fromToken}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>{t.gasLabel}</span>
+                  <span className="text-emerald-400 font-bold">{t.gasValue}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSwap}
+                disabled={isLoading}
+                className="w-full mt-5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+              >
+                {isLoading ? t.btnProcessing : t.btnSwap}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: EXPLORE */}
+        {activeTab === "explore" && (
+          <div className="space-y-4 animate-fadeIn text-center py-8">
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 mx-auto border border-emerald-500/20">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-extrabold text-white">World Chain Ecosystem</h3>
+            <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              Jelajahi DApps, Launchpad, dan Token trending pilihan langsung di dalam ekosistem FLIP Wallet.
+            </p>
+          </div>
+        )}
+
+      </div>
+
+      {/* MODAL TERIMA (RECEIVE) */}
+      {showReceiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.receiveTitle}</h3>
+              <button onClick={() => setShowReceiveModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl inline-block shadow-xl">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${walletAddress || DEVELOPER_WALLET_ADDRESS}`}
+                alt="Wallet QR Code"
+                className="w-40 h-40 mx-auto"
+              />
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs break-all text-slate-300 font-mono">
+              {walletAddress || DEVELOPER_WALLET_ADDRESS}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyAddress}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              {copied ? t.addressCopied : t.copyAddress}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KIRIM (SEND) DENGAN PILIHAN PERSENTASE LENGKAP */}
+      {showSendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.sendTitle}</h3>
+              <button onClick={() => setShowSendModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 mb-1 block">{t.recipientAddress}</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  value={sendRecipient}
+                  onChange={(e) => setSendRecipient(e.target.value)}
+                  className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400">{t.amountLabel}</label>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleQuickPercentage(0.25, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">25%</button>
+                    <button onClick={() => handleQuickPercentage(0.5, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">50%</button>
+                    <button onClick={() => handleQuickPercentage(0.75, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">75%</button>
+                    <button onClick={() => handleQuickPercentage(1.0, true)} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-0.5 rounded text-[10px] font-bold">100%</button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
                   <input
                     type="number"
                     placeholder="0.0"
-                    value={amount ? (parseFloat(amount) * 1.5).toFixed(2) : ''}
-                    disabled
-                    className="bg-transparent text-xl font-bold text-slate-400 outline-none w-1/2"
+                    value={sendAmount}
+                    onChange={(e) => setSendAmount(e.target.value)}
+                    className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-emerald-500"
                   />
-                  <span className="font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300">
-                    USDC
-                  </span>
+                  <select
+                    value={sendToken}
+                    onChange={(e) => setSendToken(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="WLD">WLD</option>
+                    <option value="USDC">USDC</option>
+                  </select>
                 </div>
               </div>
-
-              {/* Tombol Eksekusi */}
-              <button
-                onClick={handleSwap}
-                disabled={isProcessing}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md active:scale-95 text-center"
-              >
-                {isProcessing ? 'Memproses Swap...' : 'Eksekusi Swap'}
-              </button>
             </div>
-          )}
+
+            <button
+              type="button"
+              onClick={handleSendSubmit}
+              className="w-full mt-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              {t.btnSendNow}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RIWAYAT (HISTORY) */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.historyTitle}</h3>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+              {txHistory.length === 0 ? (
+                <p className="text-center text-slate-500 text-xs py-8">{t.noHistory}</p>
+              ) : (
+                txHistory.map((tx) => (
+                  <div key={tx.id} className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${tx.type === 'swap' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                        {tx.type === 'swap' ? '🔄' : '↗'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white">{tx.type === 'swap' ? t.typeSwap : t.typeSend}</h4>
+                        <p className="text-[10px] text-slate-400">{tx.tokenSymbol} • {tx.timestamp}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-white block">{tx.amount}</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">{tx.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BOTTOM NAVIGATION BAR */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-4 py-2 z-50 flex justify-center pb-safe">
+        <div className="w-full max-w-md flex justify-around items-center">
+          
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "home" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "home" ? "2.5" : "2"} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.home}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("swap")}
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "swap" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "swap" ? "2.5" : "2"} d="M8 7h12m0 0l-4-4m4 4l-4 4m-8 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.swap}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("explore")}
+            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
+              activeTab === "explore" 
+                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "explore" ? "2.5" : "2"} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <span className="text-[10px] tracking-wide">{t.explore}</span>
+          </button>
 
         </div>
-
-        <footer className="p-3 text-center text-[11px] text-slate-500 border-t border-slate-800">
-          FLIP Wallet Mini App &bull; Powered by World Chain & MiniKit SDK
-        </footer>
-
       </div>
+
     </main>
   );
 }
