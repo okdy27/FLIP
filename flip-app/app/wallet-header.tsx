@@ -23,6 +23,7 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
         return;
       }
 
+      // Cek apakah wallet sudah tersimpan di instance MiniKit
       const existingAddress =
         (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
 
@@ -35,12 +36,20 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
 
       const nonce = Math.random().toString(36).substring(2, 15);
 
-      const authRes = await (MiniKit as any).commandsAsync?.walletAuth({
+      // Menggunakan MiniKit.commands untuk MiniKit v2+
+      const payload = {
         nonce: nonce,
         requestId: `flip-auth-${Date.now()}`,
         expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         statement: 'Hubungkan dompet World ID Anda ke FLIP Wallet & Swap',
-      });
+      };
+
+      // Cek ketersediaan command walletAuth di MiniKit v2
+      if (!MiniKit.commands || typeof MiniKit.commands.walletAuth !== 'function') {
+        throw new Error('Perintah walletAuth tidak tersedia di MiniKit saat ini.');
+      }
+
+      const authRes = await MiniKit.commands.walletAuth(payload);
 
       if (authRes?.finalPayload?.status === 'success') {
         const address =
@@ -55,7 +64,7 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
           setWalletAddress('Terhubung');
         }
       } else {
-        setErrorMessage('Koneksi dompet dibatalkan.');
+        setErrorMessage('Koneksi dompet dibatalkan atau gagal.');
       }
     } catch (err: any) {
       console.error('Error Wallet Auth:', err);
