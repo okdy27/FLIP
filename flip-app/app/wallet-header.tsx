@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MiniKit } from '@worldcoin/minikit-js';
 
-export default function WalletHeader() {
+interface WalletHeaderProps {
+  onAddressConnect?: (address: string | null) => void;
+}
+
+export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -19,17 +23,16 @@ export default function WalletHeader() {
         return;
       }
 
-      // 1. Cek jika alamat dompet sudah tersimpan di MiniKit
       const existingAddress =
         (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
 
       if (existingAddress) {
         setWalletAddress(`${existingAddress.slice(0, 6)}...${existingAddress.slice(-4)}`);
+        if (onAddressConnect) onAddressConnect(existingAddress);
         setIsConnecting(false);
         return;
       }
 
-      // 2. Memanggil POP-UP Native World App untuk koneksi dompet (Wallet Auth / SIWE)
       const nonce = Math.random().toString(36).substring(2, 15);
 
       const authRes = await (MiniKit as any).commandsAsync?.walletAuth({
@@ -39,8 +42,6 @@ export default function WalletHeader() {
         statement: 'Hubungkan dompet World ID Anda ke FLIP Wallet & Swap',
       });
 
-      console.log('Response Wallet Auth:', authRes);
-
       if (authRes?.finalPayload?.status === 'success') {
         const address =
           authRes?.finalPayload?.address ||
@@ -49,6 +50,7 @@ export default function WalletHeader() {
 
         if (address) {
           setWalletAddress(`${address.slice(0, 6)}...${address.slice(-4)}`);
+          if (onAddressConnect) onAddressConnect(address);
         } else {
           setWalletAddress('Terhubung');
         }
@@ -61,9 +63,8 @@ export default function WalletHeader() {
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [onAddressConnect]);
 
-  // Memunculkan pop-up koneksi secara otomatis saat pertama kali dimuat di World App
   useEffect(() => {
     if (MiniKit.isInstalled() && !walletAddress) {
       connectWorldIDWallet();

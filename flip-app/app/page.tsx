@@ -199,6 +199,7 @@ export default function Home() {
 
   const totalPortfolioValue = tokenAssets.reduce((sum, item) => sum + item.valueUsd, 0);
 
+  // Fungsi Ambil Harga & Data Real-Time
   const fetchLivePricesAndBalances = useCallback(async (userAddress: string) => {
     setIsFetchingLive(true);
     try {
@@ -224,6 +225,7 @@ export default function Home() {
     }
   }, []);
 
+  // useEffect Utama untuk Menginisialisasi MiniKit & Mengambil Alamat Dompet
   useEffect(() => {
     if (typeof window !== "undefined") {
       MiniKit.install();
@@ -252,7 +254,6 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Handler Persentase Nominal Cepat (25%, 50%, 75%, 100%)
   const handleQuickPercentage = (percentage: number, isSendModal: boolean = false) => {
     const selectedSymbol = isSendModal ? sendToken : fromToken;
     const asset = tokenAssets.find(t => t.symbol === selectedSymbol);
@@ -462,7 +463,6 @@ export default function Home() {
 
             {/* Action Buttons: Kirim | Terima | Riwayat */}
             <div className="grid grid-cols-3 gap-2.5">
-              {/* Kirim */}
               <button
                 type="button"
                 onClick={() => setShowSendModal(true)}
@@ -476,7 +476,6 @@ export default function Home() {
                 {t.send}
               </button>
 
-              {/* Terima */}
               <button
                 type="button"
                 onClick={() => setShowReceiveModal(true)}
@@ -490,7 +489,6 @@ export default function Home() {
                 {t.receive}
               </button>
 
-              {/* Riwayat */}
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(true)}
@@ -565,7 +563,7 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* Input Pay dengan Tombol Persentase Lengkap (25%, 50%, 75%, 100%) */}
+              {/* Input Pay */}
               <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800">
                 <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
                   <span>{t.pay}</span>
@@ -672,7 +670,7 @@ export default function Home() {
 
       </div>
 
-      {/* MODAL TERIMA (RECEIVE) */}
+      {/* MODAL TERIMA */}
       {showReceiveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
@@ -704,7 +702,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL KIRIM (SEND) DENGAN PILIHAN PERSENTASE LENGKAP */}
+      {/* MODAL KIRIM */}
       {showSendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
@@ -746,7 +744,7 @@ export default function Home() {
                   <select
                     value={sendToken}
                     onChange={(e) => setSendToken(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 font-bold text-white outline-none cursor-pointer"
+                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 text-white font-bold outline-none"
                   >
                     <option value="WLD">WLD</option>
                     <option value="USDC">USDC</option>
@@ -758,7 +756,7 @@ export default function Home() {
             <button
               type="button"
               onClick={handleSendSubmit}
-              className="w-full mt-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               {t.btnSendNow}
             </button>
@@ -766,7 +764,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL RIWAYAT (HISTORY) */}
+      {/* MODAL RIWAYAT */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 max-h-[80vh] flex flex-col">
@@ -777,22 +775,19 @@ export default function Home() {
 
             <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
               {txHistory.length === 0 ? (
-                <p className="text-center text-slate-500 text-xs py-8">{t.noHistory}</p>
+                <p className="text-xs text-slate-500 text-center py-6">{t.noHistory}</p>
               ) : (
                 txHistory.map((tx) => (
-                  <div key={tx.id} className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex justify-between items-center text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-xl ${tx.type === 'swap' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                        {tx.type === 'swap' ? '🔄' : '↗'}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white">{tx.type === 'swap' ? t.typeSwap : t.typeSend}</h4>
-                        <p className="text-[10px] text-slate-400">{tx.tokenSymbol} • {tx.timestamp}</p>
-                      </div>
+                  <div key={tx.id} className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex justify-between items-center text-xs">
+                    <div>
+                      <span className="font-bold text-white block">
+                        {tx.type === "swap" ? t.typeSwap : t.typeSend} ({tx.tokenSymbol})
+                      </span>
+                      <span className="text-[10px] text-slate-500">{tx.timestamp}</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-bold text-white block">{tx.amount}</span>
-                      <span className="text-[10px] text-emerald-400 font-semibold">{tx.status}</span>
+                      <span className="font-bold text-emerald-400 block">{tx.amount}</span>
+                      <span className="text-[10px] text-slate-400">{tx.status}</span>
                     </div>
                   </div>
                 ))
@@ -802,57 +797,48 @@ export default function Home() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION BAR */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-4 py-2 z-50 flex justify-center pb-safe">
-        <div className="w-full max-w-md flex justify-around items-center">
-          
-          <button
-            type="button"
-            onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
-              activeTab === "home" 
-                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
-                : "text-slate-500 hover:text-slate-300"
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "home" ? "2.5" : "2"} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span className="text-[10px] tracking-wide">{t.home}</span>
-          </button>
+      {/* NAVIGASI BAWAH */}
+      <nav className="fixed bottom-0 max-w-md w-full bg-slate-900/90 backdrop-blur-xl border-t border-slate-800/80 px-6 py-3 flex justify-around items-center z-40">
+        <button
+          type="button"
+          onClick={() => setActiveTab("home")}
+          className={`flex flex-col items-center gap-1 text-xs font-bold transition cursor-pointer ${
+            activeTab === "home" ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          {t.home}
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("swap")}
-            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
-              activeTab === "swap" 
-                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
-                : "text-slate-500 hover:text-slate-300"
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "swap" ? "2.5" : "2"} d="M8 7h12m0 0l-4-4m4 4l-4 4m-8 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <span className="text-[10px] tracking-wide">{t.swap}</span>
-          </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("swap")}
+          className={`flex flex-col items-center gap-1 text-xs font-bold transition cursor-pointer ${
+            activeTab === "swap" ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          {t.swap}
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("explore")}
-            className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition cursor-pointer ${
-              activeTab === "explore" 
-                ? "text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20" 
-                : "text-slate-500 hover:text-slate-300"
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={activeTab === "explore" ? "2.5" : "2"} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            <span className="text-[10px] tracking-wide">{t.explore}</span>
-          </button>
-
-        </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab("explore")}
+          className={`flex flex-col items-center gap-1 text-xs font-bold transition cursor-pointer ${
+            activeTab === "explore" ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+          </svg>
+          {t.explore}
+        </button>
+      </nav>
 
     </main>
   );
