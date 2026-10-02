@@ -23,7 +23,7 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
         return;
       }
 
-      // Cek apakah wallet sudah tersimpan di instance MiniKit
+      // Cek apakah wallet sudah tersimpan
       const existingAddress =
         (MiniKit as any).walletAddress || (MiniKit as any).user?.walletAddress;
 
@@ -36,7 +36,6 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
 
       const nonce = Math.random().toString(36).substring(2, 15);
 
-      // Menggunakan MiniKit.commands untuk MiniKit v2+
       const payload = {
         nonce: nonce,
         requestId: `flip-auth-${Date.now()}`,
@@ -44,18 +43,19 @@ export default function WalletHeader({ onAddressConnect }: WalletHeaderProps) {
         statement: 'Hubungkan dompet World ID Anda ke FLIP Wallet & Swap',
       };
 
-      // Cek ketersediaan command walletAuth di MiniKit v2
-      if (!MiniKit.commands || typeof MiniKit.commands.walletAuth !== 'function') {
+      // Menggunakan casting (MiniKit as any) untuk bypass type checking TypeScript
+      const minikitAny = MiniKit as any;
+      if (!minikitAny.commands || typeof minikitAny.commands.walletAuth !== 'function') {
         throw new Error('Perintah walletAuth tidak tersedia di MiniKit saat ini.');
       }
 
-      const authRes = await MiniKit.commands.walletAuth(payload);
+      const authRes = await minikitAny.commands.walletAuth(payload);
 
       if (authRes?.finalPayload?.status === 'success') {
         const address =
           authRes?.finalPayload?.address ||
-          (MiniKit as any).walletAddress ||
-          (MiniKit as any).user?.walletAddress;
+          minikitAny.walletAddress ||
+          minikitAny.user?.walletAddress;
 
         if (address) {
           setWalletAddress(`${address.slice(0, 6)}...${address.slice(-4)}`);
