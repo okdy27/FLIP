@@ -12,6 +12,7 @@ const translations = {
     totalBalance: "Total Balance",
     send: "Send",
     receive: "Receive",
+    history: "History",
     assets: "Assets",
     networks: "World chain",
     badge: "Lowest Fee • $0 Gas Fee",
@@ -38,6 +39,10 @@ const translations = {
     recipientAddress: "Recipient Address",
     amountLabel: "Amount",
     btnSendNow: "Send Now",
+    historyTitle: "Transaction History",
+    noHistory: "No transactions yet",
+    typeSwap: "Swap",
+    typeSend: "Send",
   },
   id: {
     home: "Beranda",
@@ -46,6 +51,7 @@ const translations = {
     totalBalance: "Total Saldo",
     send: "Kirim",
     receive: "Terima",
+    history: "Riwayat",
     assets: "Aset",
     networks: "World chain",
     badge: "Swap Termurah • Biaya Gas Rp 0",
@@ -72,6 +78,10 @@ const translations = {
     recipientAddress: "Alamat Tujuan",
     amountLabel: "Jumlah",
     btnSendNow: "Kirim Sekarang",
+    historyTitle: "Riwayat Transaksi",
+    noHistory: "Belum ada transaksi",
+    typeSwap: "Tukar Token",
+    typeSend: "Kirim Token",
   },
   es: {
     home: "Inicio",
@@ -80,6 +90,7 @@ const translations = {
     totalBalance: "Balance Total",
     send: "Enviar",
     receive: "Recibir",
+    history: "Historial",
     assets: "Activos",
     networks: "World chain",
     badge: "Tarifa Más Baja • Tarifa de Gas $0",
@@ -106,6 +117,10 @@ const translations = {
     recipientAddress: "Dirección de Destino",
     amountLabel: "Monto",
     btnSendNow: "Enviar Ahora",
+    historyTitle: "Historial de Transacciones",
+    noHistory: "Aún no hay transacciones",
+    typeSwap: "Intercambio",
+    typeSend: "Enviar",
   },
 };
 
@@ -123,6 +138,16 @@ interface TokenAsset {
   iconBg: string;
 }
 
+interface TransactionLog {
+  id: string;
+  type: "swap" | "send";
+  tokenSymbol: string;
+  amount: string;
+  recipient?: string;
+  timestamp: string;
+  status: "Success" | "Pending";
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [lang, setLang] = useState<Language>("en");
@@ -133,11 +158,24 @@ export default function Home() {
   // Modal States
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Send Form States
   const [sendRecipient, setSendRecipient] = useState("");
   const [sendAmount, setSendAmount] = useState("");
   const [sendToken, setSendToken] = useState("WLD");
+
+  // Transaction History State
+  const [txHistory, setTxHistory] = useState<TransactionLog[]>([
+    {
+      id: "tx-1",
+      type: "swap",
+      tokenSymbol: "WLD ➔ USDC",
+      amount: "1.5 WLD",
+      timestamp: "Today, 13:45",
+      status: "Success",
+    },
+  ]);
 
   // State Token & Balances
   const [tokenAssets, setTokenAssets] = useState<TokenAsset[]>([
@@ -214,11 +252,35 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Handler Persentase Nominal Cepat (25%, 50%, 75%, 100%)
+  const handleQuickPercentage = (percentage: number, isSendModal: boolean = false) => {
+    const selectedSymbol = isSendModal ? sendToken : fromToken;
+    const asset = tokenAssets.find(t => t.symbol === selectedSymbol);
+    const balance = asset ? asset.amount : 10;
+    const calcValue = (balance * percentage).toFixed(4);
+
+    if (isSendModal) {
+      setSendAmount(calcValue);
+    } else {
+      setAmount(calcValue);
+    }
+  };
+
   const handleSendSubmit = async () => {
     if (!sendRecipient || !sendAmount || parseFloat(sendAmount) <= 0) {
       alert("Masukkan alamat tujuan dan jumlah token yang valid!");
       return;
     }
+
+    const newTx: TransactionLog = {
+      id: `tx-${Date.now()}`,
+      type: "send",
+      tokenSymbol: sendToken,
+      amount: `${sendAmount} ${sendToken}`,
+      recipient: `${sendRecipient.slice(0, 6)}...${sendRecipient.slice(-4)}`,
+      timestamp: "Just now",
+      status: "Success",
+    };
 
     if (MiniKit.isInstalled()) {
       try {
@@ -236,6 +298,7 @@ export default function Home() {
 
         const res = await (MiniKit.commandsAsync as any).pay(payPayload);
         console.log("Status Transfer:", res);
+        setTxHistory(prev => [newTx, ...prev]);
         setShowSendModal(false);
         setSendAmount("");
         setSendRecipient("");
@@ -243,14 +306,12 @@ export default function Home() {
         console.error("Error Send:", error);
       }
     } else {
+      setTxHistory(prev => [newTx, ...prev]);
       alert(`[Mode Browser]\n\nTransfer ${sendAmount} ${sendToken} ke:\n${sendRecipient}`);
       setShowSendModal(false);
+      setSendAmount("");
+      setSendRecipient("");
     }
-  };
-
-  const handleQuickAmount = (percentage: number) => {
-    const mockBalance = 10;
-    setAmount((mockBalance * percentage).toString());
   };
 
   const handleSwapTokens = () => {
@@ -270,6 +331,15 @@ export default function Home() {
     const feeAmount = inputAmount * FEE_PERCENTAGE;
     const swapAmount = inputAmount - feeAmount;
 
+    const newTx: TransactionLog = {
+      id: `tx-${Date.now()}`,
+      type: "swap",
+      tokenSymbol: `${fromToken} ➔ ${toToken}`,
+      amount: `${inputAmount} ${fromToken}`,
+      timestamp: "Just now",
+      status: "Success",
+    };
+
     if (MiniKit.isInstalled()) {
       try {
         const payPayload = {
@@ -286,6 +356,7 @@ export default function Home() {
 
         const res = await (MiniKit.commandsAsync as any).pay(payPayload);
         console.log("Status Komisi:", res);
+        setTxHistory(prev => [newTx, ...prev]);
       } catch (error) {
         console.error("Error transaksi:", error);
       } finally {
@@ -293,6 +364,7 @@ export default function Home() {
       }
     } else {
       setIsLoading(false);
+      setTxHistory(prev => [newTx, ...prev]);
       alert(
         `${t.previewTitle}\n\n` +
           `• Input: ${inputAmount} ${fromToken}\n` +
@@ -388,27 +460,48 @@ export default function Home() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Action Buttons: Kirim | Terima | Riwayat */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* Kirim */}
               <button
                 type="button"
                 onClick={() => setShowSendModal(true)}
-                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
               >
-                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-                </svg>
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                  </svg>
+                </div>
                 {t.send}
               </button>
+
+              {/* Terima */}
               <button
                 type="button"
                 onClick={() => setShowReceiveModal(true)}
-                className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3.5 rounded-2xl font-bold text-sm transition cursor-pointer"
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
               >
-                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
-                </svg>
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v14m0 0l7-7m-7 7l-7-7" />
+                  </svg>
+                </div>
                 {t.receive}
+              </button>
+
+              {/* Riwayat */}
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(true)}
+                className="flex flex-col items-center justify-center gap-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 p-3 rounded-2xl font-bold text-xs transition cursor-pointer"
+              >
+                <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                {t.history}
               </button>
             </div>
 
@@ -472,14 +565,15 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* Input Pay */}
+              {/* Input Pay dengan Tombol Persentase Lengkap (25%, 50%, 75%, 100%) */}
               <div className="bg-slate-950/70 rounded-2xl p-4 border border-slate-800">
-                <div className="flex justify-between text-xs text-slate-400 mb-2">
+                <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
                   <span>{t.pay}</span>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => handleQuickAmount(0.25)} className="bg-slate-800/60 hover:text-emerald-400 px-2 py-0.5 rounded text-[11px]">25%</button>
-                    <button onClick={() => handleQuickAmount(0.5)} className="bg-slate-800/60 hover:text-emerald-400 px-2 py-0.5 rounded text-[11px]">50%</button>
-                    <button onClick={() => handleQuickAmount(1)} className="bg-slate-800 font-bold text-emerald-400 px-2 py-0.5 rounded text-[11px]">MAX</button>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleQuickPercentage(0.25)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">25%</button>
+                    <button onClick={() => handleQuickPercentage(0.5)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">50%</button>
+                    <button onClick={() => handleQuickPercentage(0.75)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-1 rounded-md text-[10px] font-bold">75%</button>
+                    <button onClick={() => handleQuickPercentage(1.0)} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-1 rounded-md text-[10px] font-bold">100%</button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -588,7 +682,6 @@ export default function Home() {
             </div>
 
             <div className="p-4 bg-white rounded-2xl inline-block shadow-xl">
-              {/* Dummy QR Placeholder */}
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${walletAddress || DEVELOPER_WALLET_ADDRESS}`}
                 alt="Wallet QR Code"
@@ -611,7 +704,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL KIRIM (SEND) */}
+      {/* MODAL KIRIM (SEND) DENGAN PILIHAN PERSENTASE LENGKAP */}
       {showSendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
@@ -633,7 +726,15 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="text-slate-400 mb-1 block">{t.amountLabel}</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400">{t.amountLabel}</label>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleQuickPercentage(0.25, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">25%</button>
+                    <button onClick={() => handleQuickPercentage(0.5, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">50%</button>
+                    <button onClick={() => handleQuickPercentage(0.75, true)} className="bg-slate-800/80 hover:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold">75%</button>
+                    <button onClick={() => handleQuickPercentage(1.0, true)} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white px-2 py-0.5 rounded text-[10px] font-bold">100%</button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -661,6 +762,42 @@ export default function Home() {
             >
               {t.btnSendNow}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RIWAYAT (HISTORY) */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-white">{t.historyTitle}</h3>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+              {txHistory.length === 0 ? (
+                <p className="text-center text-slate-500 text-xs py-8">{t.noHistory}</p>
+              ) : (
+                txHistory.map((tx) => (
+                  <div key={tx.id} className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${tx.type === 'swap' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                        {tx.type === 'swap' ? '🔄' : '↗'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white">{tx.type === 'swap' ? t.typeSwap : t.typeSend}</h4>
+                        <p className="text-[10px] text-slate-400">{tx.tokenSymbol} • {tx.timestamp}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-white block">{tx.amount}</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">{tx.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
