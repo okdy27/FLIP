@@ -1,20 +1,14 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import MiniKitProvider from "./minikit-provider";
-
-export const metadata: Metadata = {
-  title: "FLIP - World App Wallet & Swap",
-  description: "Swap token instan di World App",
-};
+import './globals.css';
+import MiniKitProvider from './minikit-provider'; // Sesuaikan path jika perlu
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="id">
-      <body>
+      <body className="bg-slate-950 text-white min-h-screen">
         <MiniKitProvider>{children}</MiniKitProvider>
       </body>
     </html>
