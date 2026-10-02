@@ -126,6 +126,8 @@ interface TokenAsset {
   valueUsd: number;
   change24h: number;
   iconBg: string;
+  contractAddress?: string;
+  decimals?: number;
 }
 
 interface TransactionLog {
@@ -171,13 +173,13 @@ export default function Home() {
     },
   ]);
 
-  // Daftar Pilihan Token yang Diperluas (Lengkap dengan Ikon Warna)
+  // Daftar Pilihan Token yang Diperluas (Lengkap dengan Ikon Warna & Alamat Kontrak World Chain)
   const [tokenAssets, setTokenAssets] = useState<TokenAsset[]>([
-    { symbol: "WLD", name: "Worldcoin", amount: 4.25, priceUsd: 2.00, valueUsd: 8.50, change24h: 3.45, iconBg: "bg-emerald-500" },
-    { symbol: "USDC", name: "USD Coin", amount: 4.88, priceUsd: 1.00, valueUsd: 4.88, change24h: 0.01, iconBg: "bg-blue-500" },
-    { symbol: "USDT", name: "Tether USD", amount: 10.00, priceUsd: 1.00, valueUsd: 10.00, change24h: 0.00, iconBg: "bg-teal-500" },
-    { symbol: "ETH", name: "Ethereum", amount: 0.0025, priceUsd: 2600.00, valueUsd: 6.50, change24h: 1.82, iconBg: "bg-indigo-500" },
-    { symbol: "WBTC", name: "Wrapped Bitcoin", amount: 0.00005, priceUsd: 65000.00, valueUsd: 3.25, change24h: -0.45, iconBg: "bg-amber-500" },
+    { symbol: "WLD", name: "Worldcoin", amount: 4.25, priceUsd: 2.00, valueUsd: 8.50, change24h: 3.45, iconBg: "bg-emerald-500", contractAddress: "0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3", decimals: 18 },
+    { symbol: "USDC", name: "USD Coin", amount: 4.88, priceUsd: 1.00, valueUsd: 4.88, change24h: 0.01, iconBg: "bg-blue-500", contractAddress: "0x79a60a8438cc914800cbae917621a876b28824d1", decimals: 6 },
+    { symbol: "USDT", name: "Tether USD", amount: 10.00, priceUsd: 1.00, valueUsd: 10.00, change24h: 0.00, iconBg: "bg-teal-500", decimals: 6 },
+    { symbol: "ETH", name: "Ethereum", amount: 0.0025, priceUsd: 2600.00, valueUsd: 6.50, change24h: 1.82, iconBg: "bg-indigo-500", decimals: 18 },
+    { symbol: "WBTC", name: "Wrapped Bitcoin", amount: 0.00005, priceUsd: 65000.00, valueUsd: 3.25, change24h: -0.45, iconBg: "bg-amber-500", decimals: 8 },
     { symbol: "FOOTBALL", name: "Crazy Football", amount: 392.29, priceUsd: 0.00002, valueUsd: 0.008, change24h: -1.69, iconBg: "bg-green-600" },
     { symbol: "ORO", name: "Oro Token", amount: 0.50, priceUsd: 0.008, valueUsd: 0.004, change24h: 0.19, iconBg: "bg-yellow-500" },
     { symbol: "H2O", name: "H2O Clean", amount: 68.99, priceUsd: 0.00008, valueUsd: 0.006, change24h: 63.72, iconBg: "bg-cyan-500" },
@@ -195,23 +197,64 @@ export default function Home() {
 
   const totalPortfolioValue = tokenAssets.reduce((sum, item) => sum + item.valueUsd, 0);
 
+  // Fungsi untuk mengambil saldo live dari World Chain RPC / DexScreener
   const fetchLivePricesAndBalances = useCallback(async (userAddress: string) => {
+    if (!userAddress) return;
     setIsFetchingLive(true);
     try {
+      // 1. Ambil harga live token via DexScreener
       const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/0x2cfc0004f20f4b6dd49c09fd126a52d0899fd2c3,0x79a60a8438cc914800cbae917621a876b28824d1");
       const data = await res.json();
+      
+      let wldPrice = 2.0;
+      let usdcPrice = 1.0;
+
       if (data && data.pairs) {
         const wldPair = data.pairs.find((p: any) => p.baseToken.symbol === "WLD");
         if (wldPair) {
-          setTokenAssets(prev => prev.map(t => {
-            if (t.symbol === "WLD") {
-              const price = parseFloat(wldPair.priceUsd) || 2.0;
-              return { ...t, priceUsd: price, valueUsd: t.amount * price, change24h: parseFloat(wldPair.priceChange?.h24) || 0 };
-            }
-            return t;
-          }));
+          wldPrice = parseFloat(wldPair.priceUsd) || 2.0;
+        }
+        const usdcPair = data.pairs.find((p: any) => p.baseToken.symbol === "USDC");
+        if (usdcPair) {
+          usdcPrice = parseFloat(usdcPair.priceUsd) || 1.0;
         }
       }
+
+      // 2. Query World Chain RPC untuk native ETH balance dan ERC20 token balances (jika tersedia)
+      try {
+        const rpcRes = await fetch("https://worldchain-mainnet.g.alchemy.com/public", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "eth_getBalance",
+            params: [userAddress, "latest"]
+          })
+        });
+        const rpcData = await rpcRes.json();
+        if (rpcData && rpcData.result) {
+          const ethBalanceWei = parseInt(rpcData.result, 16);
+          const ethBal = ethBalanceWei / 1e18;
+          if (ethBal > 0) {
+            setTokenAssets(prev => prev.map(t => t.symbol === "ETH" ? { ...t, amount: ethBal, valueUsd: ethBal * t.priceUsd } : t));
+          }
+        }
+      } catch (rpcErr) {
+        console.log("RPC Balance fetch info:", rpcErr);
+      }
+
+      // Update harga token WLD & USDC di state
+      setTokenAssets(prev => prev.map(t => {
+        if (t.symbol === "WLD") {
+          return { ...t, priceUsd: wldPrice, valueUsd: t.amount * wldPrice };
+        }
+        if (t.symbol === "USDC") {
+          return { ...t, priceUsd: usdcPrice, valueUsd: t.amount * usdcPrice };
+        }
+        return t;
+      }));
+
     } catch (error) {
       console.log("Fallback harga cache:", error);
     } finally {
@@ -223,6 +266,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       MiniKit.install();
       if (MiniKit.isInstalled()) {
+        // Ambil alamat wallet langsung dari state variabel MiniKit user
         const address = MiniKit.user?.walletAddress;
         if (address) {
           setWalletAddress(address);
@@ -293,7 +337,10 @@ export default function Home() {
     } else {
       setIsLoading(false);
       setTxHistory(prev => [newTx, ...prev]);
-      alert(`[Mode Browser]\n• Input: ${inputAmount} ${fromToken}\n• Komisi FLIP (0.3%): ${feeAmount.toFixed(4)} ${fromToken}\n• Diterima: ${swapAmount.toFixed(4)} ${toToken}`);
+      alert(`[Mode Browser]
+• Input: ${inputAmount} ${fromToken}
+• Komisi FLIP (0.3%): ${feeAmount.toFixed(4)} ${fromToken}
+• Diterima: ${swapAmount.toFixed(4)} ${toToken}`);
     }
   };
 
