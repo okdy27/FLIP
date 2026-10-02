@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MiniKit } from '@worldcoin/minikit-js'
+import { MiniKit } from "@worldcoin/minikit-js";
 
 // Kamus Bahasa (Localization)
 const translations = {
@@ -70,13 +70,15 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState<Language>("en");
 
-  // Alamat Dompet Menerima Komisi Swap 0.3%
+  // Alamat Dompet Menerima Komisi Swap 0.3% (Alamat Dompet Project FLIP)
   const DEVELOPER_WALLET_ADDRESS = "0xd082493b467bb13c44aafa6e50de3d63f11e68ec";
   const FEE_PERCENTAGE = 0.003;
 
-  // Deteksi Bahasa Otomatis dari Perangkat/HP
+  // Inisialisasi MiniKit & Deteksi Bahasa Otomatis
   useEffect(() => {
     if (typeof window !== "undefined") {
+      MiniKit.install();
+
       const userLang = navigator.language.slice(0, 2).toLowerCase();
       if (userLang === "id") setLang("id");
       else if (userLang === "es") setLang("es");
@@ -110,30 +112,20 @@ export default function Home() {
 
     if (MiniKit.isInstalled()) {
       try {
-        const payPayload: PayCommandInput = {
+        const payPayload = {
           reference: `flip-swap-${Date.now()}`,
           to: DEVELOPER_WALLET_ADDRESS,
           tokens: [
             {
-              symbol: fromToken,
-              token_amount: feeAmount.toString(),
+              symbol: fromToken === "USDC" ? "USDCE" : "WLD",
+              token_amount: feeAmount.toFixed(4),
             },
           ],
           description: "FLIP Swap Fee (0.3%)",
         };
 
-        const res = await MiniKit.commandsAsync.pay({
-  reference: "some-unique-id",
-  to: "0x123...", // alamat penerima
-  tokens: [
-    {
-      symbol: "WLD",
-      token_amount: "1.0",
-    },
-  ],
-  description: "Pembayaran FLIP",
-})
-        console.log("Status Komisi:", response);
+        const res = await (MiniKit.commandsAsync as any).pay(payPayload);
+        console.log("Status Komisi:", res);
       } catch (error) {
         console.error("Error transaksi:", error);
       } finally {
@@ -143,38 +135,44 @@ export default function Home() {
       setIsLoading(false);
       alert(
         `${t.previewTitle}\n\n` +
-        `• Input: ${inputAmount} ${fromToken}\n` +
-        `• FLIP Fee (0.3%): ${feeAmount.toFixed(4)} ${fromToken}\n` +
-        `• Est. Receive: ${swapAmount.toFixed(4)} ${toToken}\n` +
-        `• Gas Fee: $0\n\n` +
-        `Open in World App for real transactions!`
+          `• Input: ${inputAmount} ${fromToken}\n` +
+          `• FLIP Fee (0.3%): ${feeAmount.toFixed(4)} ${fromToken}\n` +
+          `• Est. Receive: ${swapAmount.toFixed(4)} ${toToken}\n` +
+          `• Gas Fee: $0\n\n` +
+          `Open in World App for real transactions!`
       );
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-[#080C14] text-white font-sans relative">
-      {/* Selector Bahasa Manual di Atas Right */}
-      <div className="absolute top-4 right-4 z-20 flex gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+      {/* Selector Bahasa Manual (z-50 + touch handlers untuk World App Simulator/HP) */}
+      <div className="absolute top-4 right-4 z-50 flex gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 pointer-events-auto">
         <button
+          type="button"
           onClick={() => setLang("en")}
-          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+          onTouchEnd={() => setLang("en")}
+          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
             lang === "en" ? "bg-emerald-500 text-white" : "text-slate-400 hover:text-white"
           }`}
         >
           🇺🇸 EN
         </button>
         <button
+          type="button"
           onClick={() => setLang("id")}
-          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+          onTouchEnd={() => setLang("id")}
+          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
             lang === "id" ? "bg-emerald-500 text-white" : "text-slate-400 hover:text-white"
           }`}
         >
           🇮🇩 ID
         </button>
         <button
+          type="button"
           onClick={() => setLang("es")}
-          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+          onTouchEnd={() => setLang("es")}
+          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
             lang === "es" ? "bg-emerald-500 text-white" : "text-slate-400 hover:text-white"
           }`}
         >
@@ -198,7 +196,6 @@ export default function Home() {
 
       {/* Main Swap Card */}
       <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl rounded-3xl p-5 border border-slate-800 shadow-2xl z-10">
-        
         {/* Banner Savings */}
         <div className="mb-4 p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
           <div className="flex items-center gap-2 text-emerald-300 font-medium">
@@ -249,8 +246,9 @@ export default function Home() {
         {/* SWAP INVERT BUTTON */}
         <div className="flex justify-center -my-2.5 relative z-20">
           <button
+            type="button"
             onClick={handleSwapTokens}
-            className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 hover:text-white transition duration-200 shadow-md group"
+            className="bg-slate-800 hover:bg-emerald-600 border-4 border-[#080C14] p-2.5 rounded-2xl text-slate-300 hover:text-white transition duration-200 shadow-md group cursor-pointer"
           >
             <svg className="w-4 h-4 group-hover:rotate-180 transition duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -304,9 +302,10 @@ export default function Home() {
 
         {/* ACTION BUTTON */}
         <button
+          type="button"
           onClick={handleSwap}
           disabled={isLoading}
-          className="w-full mt-5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.99] text-white font-bold py-4 rounded-2xl transition duration-200 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+          className="w-full mt-5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.99] text-white font-bold py-4 rounded-2xl transition duration-200 shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
         >
           {isLoading ? t.btnProcessing : t.btnSwap}
         </button>
