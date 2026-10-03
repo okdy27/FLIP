@@ -9,10 +9,7 @@ import TxHistory, { TransactionItem } from '@/Components/TxHistory';
 import { fetchLiveBalances } from '@/lib/worldchain';
 
 export default function Home() {
-  // Alamat fallback default jika dibuka di luar World App (browser biasa)
-  const FALLBACK_ADDRESS = '0xd8d24c556d53f627fbb9bccafd659ad1bb8e6045';
-
-  const [userAddress, setUserAddress] = useState<string>(FALLBACK_ADDRESS);
+  const [userAddress, setUserAddress] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'home' | 'swap' | 'history'>('home');
   const [language, setLanguage] = useState<Language>('en');
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(true);
@@ -22,40 +19,55 @@ export default function Home() {
     WLD: '0.00',
     SUSHI: '0.00',
     ETH: '0.0000',
-    BTC: '0.0012',
+    BTC: '0.0000',
   });
 
-  // 1. Deteksi Otomatis Wallet Address dari MiniKit SDK (World App)
+  // 1. Deteksi Otomatis Wallet Address dari MiniKit SDK
   useEffect(() => {
-    try {
-      if (MiniKit.isInstalled()) {
-        const minikitAddress = MiniKit.user?.walletAddress || (MiniKit as unknown as { walletAddress?: string }).walletAddress;
-        if (minikitAddress) {
-          setUserAddress(minikitAddress);
+    const detectWallet = () => {
+      try {
+        if (MiniKit.isInstalled()) {
+          const minikitAddress =
+            MiniKit.user?.walletAddress ||
+            (MiniKit as unknown as { walletAddress?: string }).walletAddress;
+
+          if (minikitAddress && minikitAddress.startsWith('0x')) {
+            setUserAddress(minikitAddress);
+            return;
+          }
         }
+      } catch (err) {
+        console.warn('MiniKit belum siap:', err);
       }
-    } catch (error) {
-      console.warn('MiniKit belum terinstal atau berjalan di browser biasa:', error);
-    }
+
+      // Fallback jika dibuka di browser luar World App
+      setUserAddress('0xd8d24c556d53f627fbb9bccafd659ad1bb8e6045');
+    };
+
+    detectWallet();
+    // Re-check setelah 1 detik untuk memastikan MiniKit SDK ter-inject sempurna di World App WebView
+    const timer = setTimeout(detectWallet, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // 2. Ambil Saldo Real-Time On-Chain dari World Chain RPC
+  // 2. Fetch Saldo Real-Time On-Chain dari World Chain RPC
   const loadBalances = useCallback(async () => {
+    if (!userAddress) return;
     setIsLoadingBalance(true);
-    const targetAddress = (userAddress && userAddress.startsWith('0x')
-      ? userAddress
-      : FALLBACK_ADDRESS) as `0x${string}`;
 
+    const targetAddress = userAddress as `0x${string}`;
     const liveData = await fetchLiveBalances(targetAddress);
     setBalances(liveData);
     setIsLoadingBalance(false);
   }, [userAddress]);
 
   useEffect(() => {
-    loadBalances();
-  }, [loadBalances]);
+    if (userAddress) {
+      loadBalances();
+    }
+  }, [userAddress, loadBalances]);
 
-  // 3. Sync Tab Aktif via URL Query Params (?tab=home|swap|history)
+  // 3. Sync Tab Navigation
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab') as 'home' | 'swap' | 'history';
@@ -88,20 +100,16 @@ export default function Home() {
   const handleSend = () => {
     alert(
       language === 'id'
-        ? `Fitur Kirim Token (World Chain)`
-        : language === 'en'
-        ? `Send Token Feature (World Chain)`
-        : `Función Enviar Token (World Chain)`
+        ? `Kirim Token dari ${userAddress.slice(0, 6)}...`
+        : `Send Token from ${userAddress.slice(0, 6)}...`
     );
   };
 
   const handleReceive = () => {
     alert(
       language === 'id'
-        ? `Alamat Wallet Anda: ${userAddress}`
-        : language === 'en'
-        ? `Your Wallet Address: ${userAddress}`
-        : `Su Dirección de Billetera: ${userAddress}`
+        ? `Alamat Wallet World ID Anda:\n${userAddress}`
+        : `Your World ID Wallet Address:\n${userAddress}`
     );
   };
 
@@ -109,7 +117,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#070d12] text-white pb-24 relative font-sans select-none">
       {/* HEADER ATAS */}
       <WalletHeader
-        userAddress={userAddress}
+        userAddress={userAddress || 'Detecting Wallet...'}
         currentLang={language}
         onLanguageChange={(lang) => setLanguage(lang)}
       />
@@ -156,7 +164,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* NAVIGASI BAWAH */}
+      {/* BOTTOM NAVIGATION */}
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-[#0b131a]/95 backdrop-blur-md border-t border-slate-800/80">
         <nav className="w-full max-w-lg flex justify-around items-center py-3 px-4">
           <button
