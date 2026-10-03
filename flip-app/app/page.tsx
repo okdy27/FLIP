@@ -22,7 +22,7 @@ export default function Home() {
     BTC: '0.0000',
   });
 
-  // 1. Deteksi Otomatis Wallet Address dari MiniKit SDK
+  // 1. Ambil Wallet Asli dari MiniKit (Tanpa Hardcode Fallback Address)
   useEffect(() => {
     const detectWallet = () => {
       try {
@@ -33,28 +33,26 @@ export default function Home() {
 
           if (minikitAddress && minikitAddress.startsWith('0x')) {
             setUserAddress(minikitAddress);
-            return;
           }
         }
       } catch (err) {
-        console.warn('MiniKit belum siap:', err);
+        console.warn('MiniKit belum terhubung:', err);
       }
-
-      // Fallback jika dibuka di browser luar World App
-      setUserAddress('0xd8d24c556d53f627fbb9bccafd659ad1bb8e6045');
     };
 
     detectWallet();
-    // Re-check setelah 1 detik untuk memastikan MiniKit SDK ter-inject sempurna di World App WebView
-    const timer = setTimeout(detectWallet, 1000);
+    const timer = setTimeout(detectWallet, 1200);
     return () => clearTimeout(timer);
   }, []);
 
-  // 2. Fetch Saldo Real-Time On-Chain dari World Chain RPC
+  // 2. Fetch Saldo On-Chain World Chain Hanya Jika Wallet Asli Sudah Terdeteksi
   const loadBalances = useCallback(async () => {
-    if (!userAddress) return;
-    setIsLoadingBalance(true);
+    if (!userAddress || !userAddress.startsWith('0x')) {
+      setIsLoadingBalance(false);
+      return;
+    }
 
+    setIsLoadingBalance(true);
     const targetAddress = userAddress as `0x${string}`;
     const liveData = await fetchLiveBalances(targetAddress);
     setBalances(liveData);
@@ -67,7 +65,7 @@ export default function Home() {
     }
   }, [userAddress, loadBalances]);
 
-  // 3. Sync Tab Navigation
+  // Tab Sync
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab') as 'home' | 'swap' | 'history';
@@ -97,34 +95,26 @@ export default function Home() {
     },
   ]);
 
+  // Handler Tanpa Pop-up Alert Browser
   const handleSend = () => {
-    alert(
-      language === 'id'
-        ? `Kirim Token dari ${userAddress.slice(0, 6)}...`
-        : `Send Token from ${userAddress.slice(0, 6)}...`
-    );
+    console.log('Send triggered for:', userAddress);
   };
 
   const handleReceive = () => {
-    alert(
-      language === 'id'
-        ? `Alamat Wallet World ID Anda:\n${userAddress}`
-        : `Your World ID Wallet Address:\n${userAddress}`
-    );
+    if (userAddress && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(userAddress);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#070d12] text-white pb-24 relative font-sans select-none">
-      {/* HEADER ATAS */}
       <WalletHeader
-        userAddress={userAddress || 'Detecting Wallet...'}
+        userAddress={userAddress || 'Menghubungkan World ID...'}
         currentLang={language}
         onLanguageChange={(lang) => setLanguage(lang)}
       />
 
-      {/* KONTEN UTAMA */}
       <main className="p-4 md:p-6 max-w-lg mx-auto w-full transition-all duration-300">
-        {/* TAB HOME */}
         {activeTab === 'home' && (
           <div className="animate-fadeIn">
             <BalanceCard
@@ -141,7 +131,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB SWAP */}
         {activeTab === 'swap' && (
           <div className="pt-2 animate-fadeIn">
             <SwapCard
@@ -152,7 +141,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB RIWAYAT */}
         {activeTab === 'history' && (
           <div className="pt-2 animate-fadeIn">
             <TxHistory
@@ -164,7 +152,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* BOTTOM NAVIGATION */}
+      {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-[#0b131a]/95 backdrop-blur-md border-t border-slate-800/80">
         <nav className="w-full max-w-lg flex justify-around items-center py-3 px-4">
           <button
@@ -178,9 +166,7 @@ export default function Home() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span className="text-[10px]">
-              {language === 'id' ? 'Home' : language === 'en' ? 'Home' : 'Inicio'}
-            </span>
+            <span className="text-[10px]">Home</span>
           </button>
 
           <button
@@ -194,9 +180,7 @@ export default function Home() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
-            <span className="text-[10px]">
-              {language === 'id' ? 'Swap' : language === 'en' ? 'Swap' : 'Intercambio'}
-            </span>
+            <span className="text-[10px]">Swap</span>
           </button>
 
           <button
@@ -210,9 +194,7 @@ export default function Home() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-[10px]">
-              {language === 'id' ? 'Riwayat' : language === 'en' ? 'History' : 'Historial'}
-            </span>
+            <span className="text-[10px]">History</span>
           </button>
         </nav>
       </div>
