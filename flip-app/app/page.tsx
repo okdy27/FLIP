@@ -22,30 +22,45 @@ export default function Home() {
     BTC: '0.0000',
   });
 
-  // 1. Ambil Wallet Asli dari MiniKit (Tanpa Hardcode Fallback Address)
+  // Deteksi wallet address World ID secara otomatis dan terus-menerus hingga terhubung
   useEffect(() => {
-    const detectWallet = () => {
-      try {
-        if (MiniKit.isInstalled()) {
-          const minikitAddress =
-            MiniKit.user?.walletAddress ||
-            (MiniKit as unknown as { walletAddress?: string }).walletAddress;
+    const getAddressFromMiniKit = (): string | null => {
+      if (typeof window === 'undefined') return null;
+      if (!MiniKit.isInstalled()) return null;
 
-          if (minikitAddress && minikitAddress.startsWith('0x')) {
-            setUserAddress(minikitAddress);
-          }
-        }
-      } catch (err) {
-        console.warn('MiniKit belum terhubung:', err);
-      }
+      const address =
+        MiniKit.user?.walletAddress ||
+        (MiniKit as unknown as { walletAddress?: string }).walletAddress ||
+        null;
+
+      return address && address.startsWith('0x') ? address : null;
     };
 
-    detectWallet();
-    const timer = setTimeout(detectWallet, 1200);
-    return () => clearTimeout(timer);
+    // Cek langsung saat komponen di-mount
+    const initialAddress = getAddressFromMiniKit();
+    if (initialAddress) {
+      setUserAddress(initialAddress);
+      return;
+    }
+
+    // Polling setiap 500ms selama beberapa detik pertama untuk menunggu WebView menembakkan data wallet
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      const detected = getAddressFromMiniKit();
+      if (detected) {
+        setUserAddress(detected);
+        clearInterval(interval);
+      } else if (attempts >= 10) {
+        // Hentikan polling setelah 5 detik jika tidak terdeteksi
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // 2. Fetch Saldo On-Chain World Chain Hanya Jika Wallet Asli Sudah Terdeteksi
+  // Fetch saldo live on-chain saat userAddress berhasil terdeteksi
   const loadBalances = useCallback(async () => {
     if (!userAddress || !userAddress.startsWith('0x')) {
       setIsLoadingBalance(false);
@@ -53,10 +68,14 @@ export default function Home() {
     }
 
     setIsLoadingBalance(true);
-    const targetAddress = userAddress as `0x${string}`;
-    const liveData = await fetchLiveBalances(targetAddress);
-    setBalances(liveData);
-    setIsLoadingBalance(false);
+    try {
+      const liveData = await fetchLiveBalances(userAddress as `0x${string}`);
+      setBalances(liveData);
+    } catch (err) {
+      console.error('Error fetching live balances:', err);
+    } finally {
+      setIsLoadingBalance(false);
+    }
   }, [userAddress]);
 
   useEffect(() => {
@@ -95,7 +114,6 @@ export default function Home() {
     },
   ]);
 
-  // Handler Tanpa Pop-up Alert Browser
   const handleSend = () => {
     console.log('Send triggered for:', userAddress);
   };
@@ -109,7 +127,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#070d12] text-white pb-24 relative font-sans select-none">
       <WalletHeader
-        userAddress={userAddress || 'Menghubungkan World ID...'}
+        userAddress={userAddress || 'Connecting World ID...'}
         currentLang={language}
         onLanguageChange={(lang) => setLanguage(lang)}
       />
@@ -152,7 +170,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-[#0b131a]/95 backdrop-blur-md border-t border-slate-800/80">
         <nav className="w-full max-w-lg flex justify-around items-center py-3 px-4">
           <button
@@ -164,7 +181,7 @@ export default function Home() {
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 011-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 011 1m-6 0h6" />
             </svg>
             <span className="text-[10px]">Home</span>
           </button>
