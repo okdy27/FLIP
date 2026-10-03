@@ -5,11 +5,12 @@ import { MiniKit } from '@worldcoin/minikit-js';
 
 export default function MiniKitProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-    // Memastikan MiniKit diinisialisasi dengan benar
     try {
+      // Inisialisasi MiniKit SDK
       MiniKit.install();
+      console.log('MiniKit successfully installed');
     } catch (error) {
-      console.error('Gagal menginstal MiniKit:', error);
+      console.error('MiniKit installation failed:', error);
     }
   }, []);
 

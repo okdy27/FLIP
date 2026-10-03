@@ -2,8 +2,8 @@ import './globals.css';
 import MiniKitProvider from '@/Providers/minikit-provider';
 
 export const metadata = {
-  title: 'FLIP Dompet',
-  description: 'World Chain Mini App',
+  title: 'FLIP Wallet',
+  description: 'World Chain Mini App Wallet',
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
+    <html lang="en">
       <body>
         <MiniKitProvider>
           {children}
